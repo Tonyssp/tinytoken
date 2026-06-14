@@ -5,6 +5,12 @@
 upload
 *.exe
 *.db
+*.dump
+*.pem
+*.tar
+*.tar.gz
+*.zip
+*.log
 build
 *.db-journal
 logs
@@ -13,6 +19,8 @@ web/classic/dist
 web/node_modules
 web/dist
 .env
+.env.production
+.env.*.local
 one-api
 new-api
 /__debug_bin*
