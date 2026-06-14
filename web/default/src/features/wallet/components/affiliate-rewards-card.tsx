@@ -70,11 +70,6 @@ export function AffiliateRewardsCard({
             <h3 className='truncate text-sm font-semibold'>
               {t('Referral Program')}
             </h3>
-            <p className='text-muted-foreground line-clamp-1 text-xs'>
-              {t(
-                'Earn rewards when your referrals add funds. Transfer accumulated rewards to your balance anytime.'
-              )}
-            </p>
           </div>
         </div>
 

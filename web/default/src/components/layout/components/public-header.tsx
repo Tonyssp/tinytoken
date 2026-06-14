@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
+import { Mail } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '@/stores/auth-store'
 import { cn } from '@/lib/utils'
@@ -25,18 +26,10 @@ import { useNotifications } from '@/hooks/use-notifications'
 import { useSystemConfig } from '@/hooks/use-system-config'
 import { useTopNavLinks } from '@/hooks/use-top-nav-links'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Dialog } from '@/components/dialog'
 import { LanguageSwitcher } from '@/components/language-switcher'
-import { NotificationButton } from '@/components/notification-button'
-import { NotificationDialog } from '@/components/notification-dialog'
+import { NotificationPopover } from '@/components/notification-popover'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { defaultTopNavLinks } from '../config/top-nav.config'
@@ -70,6 +63,8 @@ export interface PublicHeaderProps {
 export function PublicHeader(props: PublicHeaderProps) {
   const {
     navLinks = defaultTopNavLinks,
+    mobileLinks,
+    navContent,
     showThemeSwitch = true,
     showLanguageSwitcher = true,
     logo: customLogo,
@@ -103,6 +98,13 @@ export function PublicHeader(props: PublicHeaderProps) {
   const isAuthenticated = !!user
   const displaySiteName = customSiteName || systemName
   const links = dynamicLinks.length > 0 ? dynamicLinks : navLinks
+  const desktopLinks = navContent
+    ? links.filter((link) => {
+        const href = link.href.replace(/\/+$/, '') || '/'
+        return href === '/pricing'
+      })
+    : links
+  const mobileNavigationLinks = mobileLinks || links
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20)
@@ -185,44 +187,66 @@ export function PublicHeader(props: PublicHeaderProps) {
         <div
           className={cn(
             'pointer-events-auto mx-auto transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]',
-            scrolled ? 'max-w-[52rem] px-3 pt-3' : 'max-w-7xl px-4 pt-0 md:px-6'
+            scrolled && navContent
+              ? 'max-w-[96rem] px-3 pt-3'
+              : scrolled
+                ? 'max-w-[52rem] px-3 pt-3'
+                : navContent
+                  ? 'max-w-[96rem] px-4 pt-0 md:px-6'
+                  : 'max-w-7xl px-4 pt-0 md:px-6'
           )}
         >
           <nav
             className={cn(
-              'flex items-center justify-between transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]',
-              scrolled
-                ? 'bg-background/60 ring-border/50 h-12 rounded-2xl pr-1.5 pl-4 shadow-[0_2px_16px_-6px_rgba(0,0,0,0.08),0_0_0_0.5px_rgba(0,0,0,0.02)] ring-[0.5px] backdrop-blur-2xl dark:shadow-[0_2px_16px_-6px_rgba(0,0,0,0.4)]'
-                : 'h-16 px-2'
+              'flex items-center gap-3 transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]',
+              navContent
+                ? scrolled
+                  ? 'bg-background/60 ring-border/50 min-h-16 flex-wrap rounded-2xl px-4 py-2 shadow-[0_2px_16px_-6px_rgba(0,0,0,0.08),0_0_0_0.5px_rgba(0,0,0,0.02)] ring-[0.5px] backdrop-blur-2xl xl:flex-nowrap dark:shadow-[0_2px_16px_-6px_rgba(0,0,0,0.4)]'
+                  : 'min-h-20 flex-wrap px-2 py-2 xl:h-20 xl:flex-nowrap xl:py-0'
+                : scrolled
+                  ? 'bg-background/60 ring-border/50 h-12 rounded-2xl pr-1.5 pl-4 shadow-[0_2px_16px_-6px_rgba(0,0,0,0.08),0_0_0_0.5px_rgba(0,0,0,0.02)] ring-[0.5px] backdrop-blur-2xl dark:shadow-[0_2px_16px_-6px_rgba(0,0,0,0.4)]'
+                  : 'h-16 px-2'
             )}
           >
-            {/* Logo */}
-            <Link
-              to={homeUrl}
-              className='group flex shrink-0 items-center gap-2.5'
-            >
-              <div className='flex size-7 shrink-0 items-center justify-center transition-all duration-300 group-hover:scale-105'>
-                {loading ? (
-                  <Skeleton className='size-full rounded-lg' />
-                ) : customLogo ? (
-                  customLogo
-                ) : (
-                  <HeaderLogo
-                    src={systemLogo}
-                    loading={loading}
-                    logoLoaded={logoLoaded}
-                    className='size-full rounded-lg object-contain'
-                  />
-                )}
+            <div className='flex shrink-0 items-center gap-3'>
+              {/* Logo */}
+              <Link
+                to={homeUrl}
+                className='group flex shrink-0 items-center gap-2.5'
+              >
+                <div className='flex size-9 shrink-0 items-center justify-center transition-all duration-300 group-hover:scale-105'>
+                  {loading ? (
+                    <Skeleton className='size-full rounded-lg' />
+                  ) : customLogo ? (
+                    customLogo
+                  ) : (
+                    <HeaderLogo
+                      src={systemLogo}
+                      loading={loading}
+                      logoLoaded={logoLoaded}
+                      className='size-full rounded-lg object-contain'
+                    />
+                  )}
+                </div>
+                <span className='text-base font-semibold tracking-tight'>
+                  {loading ? (
+                    <Skeleton className='h-4 w-16' />
+                  ) : (
+                    displaySiteName
+                  )}
+                </span>
+              </Link>
+            </div>
+
+            {navContent && (
+              <div className='order-last hidden w-full min-w-0 items-center md:flex xl:order-none xl:w-auto xl:flex-1'>
+                {navContent}
               </div>
-              <span className='text-sm font-semibold tracking-tight'>
-                {loading ? <Skeleton className='h-4 w-16' /> : displaySiteName}
-              </span>
-            </Link>
+            )}
 
             {/* Desktop nav */}
-            <div className='hidden items-center gap-0.5 sm:flex'>
-              {links.map((link, i) => {
+            <div className='ml-auto hidden shrink-0 items-center gap-0.5 sm:flex'>
+              {desktopLinks.map((link, i) => {
                 const isActive = pathname === link.href
                 if (link.external) {
                   return (
@@ -243,6 +267,7 @@ export function PublicHeader(props: PublicHeaderProps) {
                     </a>
                   )
                 }
+                const isPricing = link.href.replace(/\/+$/, '') === '/pricing'
                 return (
                   <Link
                     key={i}
@@ -250,14 +275,16 @@ export function PublicHeader(props: PublicHeaderProps) {
                     disabled={link.disabled}
                     onClick={(event) => handleNavLinkClick(event, link)}
                     className={cn(
-                      'rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors duration-200',
-                      isActive
-                        ? 'text-foreground'
-                        : 'text-muted-foreground hover:text-foreground',
+                      'inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-center text-[13px] font-medium transition-all duration-200',
+                      isPricing
+                        ? 'h-12 rounded-full border border-indigo-200 bg-indigo-600 px-7 py-0 text-base font-bold text-white shadow-lg shadow-indigo-500/25 ring-2 ring-indigo-500/10 hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-indigo-500/35 dark:border-indigo-300/20 dark:bg-indigo-500 dark:shadow-indigo-500/20 dark:ring-indigo-400/15 dark:hover:bg-indigo-400'
+                        : isActive
+                          ? 'text-foreground'
+                          : 'text-muted-foreground hover:text-foreground',
                       link.disabled && 'pointer-events-none opacity-50'
                     )}
                   >
-                    {t(link.title)}
+                    {isPricing ? 'ดูราคาโมเดล' : t(link.title)}
                   </Link>
                 )
               })}
@@ -271,10 +298,31 @@ export function PublicHeader(props: PublicHeaderProps) {
               {showLanguageSwitcher && <LanguageSwitcher />}
               {showThemeSwitch && <ThemeSwitch />}
               {showNotifications && (
-                <NotificationButton
+                <NotificationPopover
+                  open={notifications.popoverOpen}
+                  onOpenChange={notifications.setPopoverOpen}
                   unreadCount={notifications.unreadCount}
-                  onClick={() => notifications.openDialog()}
+                  activeTab={notifications.activeTab}
+                  onTabChange={notifications.setActiveTab}
+                  notice={notifications.notice}
+                  announcements={notifications.announcements}
+                  loading={notifications.loading}
                 />
+              )}
+
+              {navContent && (
+                <Link
+                  to='/about'
+                  className={cn(
+                    'inline-flex h-12 items-center gap-2.5 rounded-lg px-4 text-[15px] font-semibold transition-colors',
+                    pathname === '/about'
+                      ? 'bg-slate-100 text-slate-950 dark:bg-slate-800 dark:text-white'
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'
+                  )}
+                >
+                  <Mail className='size-[18px]' />
+                  <span>Contact Us</span>
+                </Link>
               )}
 
               {showAuthButtons && (
@@ -348,7 +396,7 @@ export function PublicHeader(props: PublicHeaderProps) {
       >
         <div className='flex h-full flex-col justify-between px-8 pt-20 pb-10'>
           <nav className='flex flex-col gap-1'>
-            {links.map((link, i) => {
+            {mobileNavigationLinks.map((link, i) => {
               const isActive = pathname === link.href
               const linkClassName = cn(
                 'flex items-center gap-3 py-3 text-base font-medium tracking-tight transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]',
@@ -422,43 +470,27 @@ export function PublicHeader(props: PublicHeaderProps) {
             closeAuthPrompt()
           }
         }}
-      >
-        <DialogContent className='sm:max-w-md'>
-          <DialogHeader>
-            <DialogTitle>{t('Sign in required')}</DialogTitle>
-            <DialogDescription>
-              {t('Please sign in to view {{module}}.', {
-                module: authPromptTarget?.title || '',
-              })}
-            </DialogDescription>
-          </DialogHeader>
-          <div className='bg-muted/40 text-muted-foreground rounded-lg px-3 py-2 text-sm'>
-            {t('Redirecting to sign in in {{seconds}} seconds.', {
-              seconds: authPromptSecondsLeft,
-            })}
-          </div>
-          <DialogFooter>
+        title={t('Sign in required')}
+        description={t('Please sign in to view {{module}}.', {
+          module: authPromptTarget?.title || '',
+        })}
+        contentClassName='sm:max-w-md'
+        contentHeight='auto'
+        footer={
+          <>
             <Button variant='outline' onClick={closeAuthPrompt}>
               {t('Cancel')}
             </Button>
             <Button onClick={navigateToSignIn}>{t('Sign in now')}</Button>
-          </DialogFooter>
-        </DialogContent>
+          </>
+        }
+      >
+        <div className='bg-muted/40 text-muted-foreground rounded-lg px-3 py-2 text-sm'>
+          {t('Redirecting to sign in in {{seconds}} seconds.', {
+            seconds: authPromptSecondsLeft,
+          })}
+        </div>
       </Dialog>
-
-      {/* Notification Dialog */}
-      {showNotifications && (
-        <NotificationDialog
-          open={notifications.dialogOpen}
-          onOpenChange={notifications.setDialogOpen}
-          activeTab={notifications.activeTab}
-          onTabChange={notifications.setActiveTab}
-          notice={notifications.notice}
-          announcements={notifications.announcements}
-          loading={notifications.loading}
-          onCloseToday={notifications.closeToday}
-        />
-      )}
     </>
   )
 }

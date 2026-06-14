@@ -1,10 +1,18 @@
 package controller
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,6 +22,7 @@ import (
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/QuantumNous/new-api/setting/system_setting"
 
 	"github.com/Calcium-Ion/go-epay/epay"
 	"github.com/gin-gonic/gin"
@@ -52,6 +61,27 @@ func GetTopUpInfo(c *gin.Context) {
 		}
 	}
 
+	// Waffo Pancake displayed above the legacy Waffo gateway.
+	enableWaffoPancake := isWaffoPancakeTopUpEnabled()
+	if enableWaffoPancake {
+		hasWaffoPancake := false
+		for _, method := range payMethods {
+			if method["type"] == model.PaymentMethodWaffoPancake {
+				hasWaffoPancake = true
+				break
+			}
+		}
+
+		if !hasWaffoPancake {
+			payMethods = append(payMethods, map[string]string{
+				"name":      "Waffo Pancake",
+				"type":      model.PaymentMethodWaffoPancake,
+				"color":     "rgba(var(--semi-orange-5), 1)",
+				"min_topup": strconv.Itoa(setting.WaffoPancakeMinTopUp),
+			})
+		}
+	}
+
 	// 如果启用了 Waffo 支付，添加到支付方法列表
 	enableWaffo := isWaffoTopUpEnabled()
 	if enableWaffo {
@@ -74,23 +104,13 @@ func GetTopUpInfo(c *gin.Context) {
 		}
 	}
 
-	enableWaffoPancake := isWaffoPancakeTopUpEnabled()
-	if enableWaffoPancake {
-		hasWaffoPancake := false
-		for _, method := range payMethods {
-			if method["type"] == model.PaymentMethodWaffoPancake {
-				hasWaffoPancake = true
-				break
-			}
-		}
-
-		if !hasWaffoPancake {
-			payMethods = append(payMethods, map[string]string{
-				"name":      "Waffo Pancake",
-				"type":      model.PaymentMethodWaffoPancake,
-				"color":     "rgba(var(--semi-orange-5), 1)",
-				"min_topup": strconv.Itoa(setting.WaffoPancakeMinTopUp),
-			})
+	paymentSetting := operation_setting.GetPaymentSetting()
+	enablePromptPay := complianceConfirmed && paymentSetting.PromptPayEnabled
+	enableOtherPayment := complianceConfirmed && paymentSetting.OtherPaymentEnabled
+	otherPaymentMethods := make([]operation_setting.OtherPaymentMethod, 0, len(paymentSetting.OtherPaymentMethods))
+	for _, method := range paymentSetting.OtherPaymentMethods {
+		if method.Enabled {
+			otherPaymentMethods = append(otherPaymentMethods, method)
 		}
 	}
 
@@ -100,6 +120,22 @@ func GetTopUpInfo(c *gin.Context) {
 		"enable_creem_topup":               isCreemTopUpEnabled(),
 		"enable_waffo_topup":               enableWaffo,
 		"enable_waffo_pancake_topup":       enableWaffoPancake,
+		"enable_promptpay_topup":           enablePromptPay,
+		"promptpay_mode":                   paymentSetting.PromptPayMode,
+		"promptpay_account_name":           paymentSetting.PromptPayAccountName,
+		"promptpay_id":                     paymentSetting.PromptPayId,
+		"promptpay_bank_name":              paymentSetting.PromptPayBankName,
+		"promptpay_rate":                   paymentSetting.PromptPayRate,
+		"promptpay_min_topup":              paymentSetting.PromptPayMinTopUp,
+		"promptpay_amount_options":         paymentSetting.PromptPayAmountOptions,
+		"promptpay_slip_provider":          paymentSetting.PromptPaySlipProvider,
+		"promptpay_transaction_export":     paymentSetting.PromptPayTransactionExport,
+		"enable_other_payment_topup":       enableOtherPayment,
+		"other_payment_currency":           paymentSetting.OtherPaymentCurrency,
+		"other_payment_rate":               paymentSetting.OtherPaymentRate,
+		"other_payment_min_topup":          paymentSetting.OtherPaymentMinTopUp,
+		"other_payment_amount_options":     paymentSetting.OtherPaymentAmountOptions,
+		"other_payment_methods":            otherPaymentMethods,
 		"enable_redemption":                complianceConfirmed,
 		"payment_compliance_confirmed":     complianceConfirmed,
 		"payment_compliance_terms_version": operation_setting.CurrentComplianceTermsVersion,
@@ -115,8 +151,8 @@ func GetTopUpInfo(c *gin.Context) {
 		"stripe_min_topup":        setting.StripeMinTopUp,
 		"waffo_min_topup":         setting.WaffoMinTopUp,
 		"waffo_pancake_min_topup": setting.WaffoPancakeMinTopUp,
-		"amount_options":          operation_setting.GetPaymentSetting().AmountOptions,
-		"discount":                operation_setting.GetPaymentSetting().AmountDiscount,
+		"amount_options":          paymentSetting.AmountOptions,
+		"discount":                paymentSetting.AmountDiscount,
 		"topup_link":              common.TopUpLink,
 	}
 	common.ApiSuccess(c, data)
@@ -129,6 +165,584 @@ type EpayRequest struct {
 
 type AmountRequest struct {
 	Amount int64 `json:"amount"`
+}
+
+type otherPaymentTelegramUpdate struct {
+	Message *struct {
+		MessageID int    `json:"message_id"`
+		Text      string `json:"text"`
+		From      struct {
+			ID int64 `json:"id"`
+		} `json:"from"`
+		Chat struct {
+			ID int64 `json:"id"`
+		} `json:"chat"`
+		ReplyToMessage *struct {
+			MessageID int    `json:"message_id"`
+			Caption   string `json:"caption"`
+		} `json:"reply_to_message"`
+	} `json:"message"`
+}
+
+var otherPaymentApprovalMessages sync.Map
+
+func otherPaymentApprovalKey(chatID int64, messageID int) string {
+	return fmt.Sprintf("%d:%d", chatID, messageID)
+}
+
+func telegramTopupWebhookSecret(botToken string) string {
+	configured := strings.TrimSpace(operation_setting.GetPaymentSetting().OtherPaymentConfirmSecret)
+	if configured != "" {
+		return configured
+	}
+	sum := sha256.Sum256([]byte("tinyapi-topup:" + botToken))
+	return fmt.Sprintf("%x", sum[:16])
+}
+
+func ensureTelegramTopupWebhook(botToken string) {
+	serverAddress := strings.TrimRight(strings.TrimSpace(system_setting.ServerAddress), "/")
+	if botToken == "" || !strings.HasPrefix(serverAddress, "https://") {
+		return
+	}
+
+	webhookURL := fmt.Sprintf(
+		"%s/api/payment/other/telegram/webhook?secret=%s",
+		serverAddress,
+		url.QueryEscape(telegramTopupWebhookSecret(botToken)),
+	)
+	form := url.Values{
+		"url":             {webhookURL},
+		"allowed_updates": {`["message"]`},
+	}
+	endpoint := fmt.Sprintf("https://api.telegram.org/bot%s/setWebhook", botToken)
+	req, err := http.NewRequest(http.MethodPost, endpoint, strings.NewReader(form.Encode()))
+	if err != nil {
+		common.SysLog("failed to build Telegram webhook request: " + err.Error())
+		return
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := service.GetHttpClient().Do(req)
+	if err != nil {
+		common.SysLog("failed to configure Telegram topup webhook: " + err.Error())
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		common.SysLog(fmt.Sprintf("Telegram topup webhook returned HTTP %d", resp.StatusCode))
+	}
+}
+
+func telegramApprovalBot(chatID int64) (string, bool) {
+	paymentSetting := operation_setting.GetPaymentSetting()
+	configs := []struct {
+		enabled bool
+		token   string
+		chatID  string
+	}{
+		{
+			enabled: paymentSetting.PromptPayTelegramEnabled,
+			token:   paymentSetting.PromptPayTelegramBotSecret,
+			chatID:  paymentSetting.PromptPayTelegramChatId,
+		},
+		{
+			enabled: paymentSetting.OtherPaymentTelegramEnabled,
+			token:   paymentSetting.OtherPaymentTelegramBotSecret,
+			chatID:  paymentSetting.OtherPaymentTelegramChatId,
+		},
+	}
+	for _, config := range configs {
+		configuredChatID, err := strconv.ParseInt(strings.TrimSpace(config.chatID), 10, 64)
+		if err == nil && config.enabled && config.token != "" && configuredChatID == chatID {
+			return config.token, true
+		}
+	}
+	return "", false
+}
+
+func isTelegramGroupAdmin(botToken string, chatID int64, userID int64) bool {
+	endpoint := fmt.Sprintf(
+		"https://api.telegram.org/bot%s/getChatMember?chat_id=%d&user_id=%d",
+		botToken,
+		chatID,
+		userID,
+	)
+	resp, err := service.GetHttpClient().Get(endpoint)
+	if err != nil {
+		common.SysLog("failed to verify Telegram admin: " + err.Error())
+		return false
+	}
+	defer resp.Body.Close()
+
+	var parsed struct {
+		OK     bool `json:"ok"`
+		Result struct {
+			Status string `json:"status"`
+		} `json:"result"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil || !parsed.OK {
+		return false
+	}
+	return parsed.Result.Status == "administrator" || parsed.Result.Status == "creator"
+}
+
+func findOtherPaymentMethod(methodID string) (operation_setting.OtherPaymentMethod, bool) {
+	for _, method := range operation_setting.GetPaymentSetting().OtherPaymentMethods {
+		if method.Enabled && method.Id == methodID {
+			return method, true
+		}
+	}
+	return operation_setting.OtherPaymentMethod{}, false
+}
+
+func saveTopupSlip(tradeNo string, header *multipart.FileHeader) (string, []byte, error) {
+	file, err := header.Open()
+	if err != nil {
+		return "", nil, err
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(io.LimitReader(file, 6*1024*1024))
+	if err != nil {
+		return "", nil, err
+	}
+	if len(data) > 5*1024*1024 {
+		return "", nil, fmt.Errorf("slip file too large")
+	}
+
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+	switch ext {
+	case ".jpg", ".jpeg", ".png", ".webp", ".pdf":
+	default:
+		ext = ".bin"
+	}
+
+	dir := filepath.Join("data", "topup_slips")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", nil, err
+	}
+
+	path := filepath.Join(dir, tradeNo+ext)
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return "", nil, err
+	}
+	return path, data, nil
+}
+
+func notifyTelegramManualTopup(enabled bool, botToken string, chatID string, tradeNo string, text string, slipName string, slipBytes []byte) {
+	if !enabled || botToken == "" || chatID == "" {
+		return
+	}
+
+	ensureTelegramTopupWebhook(botToken)
+
+	method := "sendDocument"
+	fileField := "document"
+	switch strings.ToLower(filepath.Ext(slipName)) {
+	case ".jpg", ".jpeg", ".png", ".webp":
+		method = "sendPhoto"
+		fileField = "photo"
+	}
+
+	endpoint := fmt.Sprintf("https://api.telegram.org/bot%s/%s", botToken, method)
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	_ = writer.WriteField("chat_id", chatID)
+	_ = writer.WriteField("caption", text)
+	part, err := writer.CreateFormFile(fileField, slipName)
+	if err == nil {
+		_, _ = part.Write(slipBytes)
+	}
+	_ = writer.Close()
+
+	req, err := http.NewRequest(http.MethodPost, endpoint, &body)
+	if err != nil {
+		common.SysLog("failed to build Telegram topup request: " + err.Error())
+		return
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	client := service.GetHttpClient()
+	resp, err := client.Do(req)
+	if err != nil {
+		common.SysLog("failed to send Telegram topup notification: " + err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	var parsed struct {
+		OK     bool `json:"ok"`
+		Result struct {
+			MessageID int `json:"message_id"`
+			Chat      struct {
+				ID int64 `json:"id"`
+			} `json:"chat"`
+		} `json:"result"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&parsed)
+	if parsed.OK && parsed.Result.MessageID != 0 {
+		otherPaymentApprovalMessages.Store(
+			otherPaymentApprovalKey(parsed.Result.Chat.ID, parsed.Result.MessageID),
+			tradeNo,
+		)
+	}
+}
+
+func notifyTelegramOtherPayment(setting *operation_setting.PaymentSetting, tradeNo string, text string, slipName string, slipBytes []byte) {
+	notifyTelegramManualTopup(
+		setting.OtherPaymentTelegramEnabled,
+		setting.OtherPaymentTelegramBotSecret,
+		setting.OtherPaymentTelegramChatId,
+		tradeNo,
+		text,
+		slipName,
+		slipBytes,
+	)
+}
+
+func notifyTelegramPromptPay(setting *operation_setting.PaymentSetting, tradeNo string, text string, slipName string, slipBytes []byte) {
+	notifyTelegramManualTopup(
+		setting.PromptPayTelegramEnabled,
+		setting.PromptPayTelegramBotSecret,
+		setting.PromptPayTelegramChatId,
+		tradeNo,
+		text,
+		slipName,
+		slipBytes,
+	)
+}
+
+func notifyLineOtherPayment(setting *operation_setting.PaymentSetting, text string) {
+	if !setting.OtherPaymentLineEnabled || setting.OtherPaymentLineAccessSecret == "" || setting.OtherPaymentLineGroupId == "" {
+		return
+	}
+
+	payload := map[string]any{
+		"to": setting.OtherPaymentLineGroupId,
+		"messages": []map[string]string{
+			{
+				"type": "text",
+				"text": strings.ReplaceAll(text, "<br>", "\n"),
+			},
+		},
+	}
+	body, _ := json.Marshal(payload)
+	req, err := http.NewRequest(http.MethodPost, "https://api.line.me/v2/bot/message/push", bytes.NewReader(body))
+	if err != nil {
+		common.SysLog("failed to build LINE topup request: " + err.Error())
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+setting.OtherPaymentLineAccessSecret)
+
+	resp, err := service.GetHttpClient().Do(req)
+	if err != nil {
+		common.SysLog("failed to send LINE topup notification: " + err.Error())
+		return
+	}
+	defer resp.Body.Close()
+}
+
+func buildOtherPaymentNotification(tradeNo string, userID int, amount int64, creditAmount int64, method operation_setting.OtherPaymentMethod, bankFrom string) string {
+	return fmt.Sprintf(
+		"New Laos manual top-up\nTrade: %s\nUser ID: %d\nAmount: %s LAK\nCredit: %d\nMethod: %s\nBank from: %s\n\nTelegram confirm: reply 1 to this message, or send: 1 %s\nLINE confirm: send: 1 %s",
+		tradeNo,
+		userID,
+		formatIntWithCommas(amount),
+		creditAmount,
+		method.Name,
+		bankFrom,
+		tradeNo,
+		tradeNo,
+	)
+}
+
+func buildPromptPayNotification(tradeNo string, userID int, amount int64, creditAmount int64, bankFrom string) string {
+	return fmt.Sprintf(
+		"คำขอเติมเครดิต PromptPay ใหม่\nเลขที่รายการ: %s\nUser ID: %d\nยอดโอน: %s บาท\nเครดิตที่จะได้รับ: %d\nธนาคารต้นทาง: %s\n\nตรวจสอบสลิปแล้วตอบ 1 ที่ข้อความนี้เพื่ออนุมัติ\nหรือส่ง: 1 %s",
+		tradeNo,
+		userID,
+		formatIntWithCommas(amount),
+		creditAmount,
+		bankFrom,
+		tradeNo,
+	)
+}
+
+func formatIntWithCommas(value int64) string {
+	raw := strconv.FormatInt(value, 10)
+	if len(raw) <= 3 {
+		return raw
+	}
+	var out []byte
+	for i, r := range raw {
+		if i > 0 && (len(raw)-i)%3 == 0 {
+			out = append(out, ',')
+		}
+		out = append(out, byte(r))
+	}
+	return string(out)
+}
+
+func confirmOtherPaymentTrade(tradeNo string, callerIp string) error {
+	LockOrder(tradeNo)
+	defer UnlockOrder(tradeNo)
+
+	return model.ManualCompleteTopUp(tradeNo, callerIp)
+}
+
+func parseOtherPaymentConfirmText(text string) string {
+	fields := strings.Fields(strings.TrimSpace(text))
+	if len(fields) >= 2 && (fields[0] == "1" || strings.EqualFold(fields[0], "confirm") || strings.EqualFold(fields[0], "/confirm")) {
+		return fields[1]
+	}
+	return ""
+}
+
+func tradeNoFromTelegramCaption(caption string) string {
+	for _, line := range strings.Split(caption, "\n") {
+		line = strings.TrimSpace(line)
+		for _, prefix := range []string{"เลขที่รายการ:", "Trade:"} {
+			if strings.HasPrefix(line, prefix) {
+				return strings.TrimSpace(strings.TrimPrefix(line, prefix))
+			}
+		}
+	}
+	return ""
+}
+
+func sendTelegramApprovalResult(botToken string, chatID int64, replyToMessageID int, tradeNo string) {
+	form := url.Values{
+		"chat_id":             {strconv.FormatInt(chatID, 10)},
+		"reply_to_message_id": {strconv.Itoa(replyToMessageID)},
+		"text":                {fmt.Sprintf("อนุมัติรายการ %s สำเร็จ และเติมเครดิตให้ผู้ใช้แล้ว", tradeNo)},
+	}
+	endpoint := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
+	req, err := http.NewRequest(http.MethodPost, endpoint, strings.NewReader(form.Encode()))
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := service.GetHttpClient().Do(req)
+	if err == nil {
+		defer resp.Body.Close()
+	}
+}
+
+func RequestPromptPayTopUp(c *gin.Context) {
+	paymentSetting := operation_setting.GetPaymentSetting()
+	if !operation_setting.IsPaymentComplianceConfirmed() || !paymentSetting.PromptPayEnabled {
+		common.ApiErrorMsg(c, "PromptPay is not enabled")
+		return
+	}
+
+	amount, err := strconv.ParseInt(strings.TrimSpace(c.PostForm("amount")), 10, 64)
+	if err != nil || amount <= 0 {
+		common.ApiErrorMsg(c, "Invalid amount")
+		return
+	}
+	if amount < int64(paymentSetting.PromptPayMinTopUp) {
+		common.ApiErrorMsg(c, fmt.Sprintf("Minimum top-up is %d THB", int64(paymentSetting.PromptPayMinTopUp)))
+		return
+	}
+
+	bankFrom := strings.TrimSpace(c.PostForm("bank_from"))
+	if bankFrom == "" {
+		common.ApiErrorMsg(c, "Bank is required")
+		return
+	}
+
+	slip, err := c.FormFile("slip")
+	if err != nil {
+		common.ApiErrorMsg(c, "Slip file is required")
+		return
+	}
+
+	creditAmount := int64(decimal.NewFromInt(amount).Mul(decimal.NewFromFloat(paymentSetting.PromptPayRate)).IntPart())
+	if creditAmount <= 0 {
+		common.ApiErrorMsg(c, "Invalid credit rate")
+		return
+	}
+
+	userID := c.GetInt("id")
+	tradeNo := fmt.Sprintf("THA%dNO%s%d", userID, common.GetRandomString(6), time.Now().Unix())
+	_, slipBytes, err := saveTopupSlip(tradeNo, slip)
+	if err != nil {
+		common.ApiErrorMsg(c, "Failed to save slip: "+err.Error())
+		return
+	}
+
+	topUp := &model.TopUp{
+		UserId:          userID,
+		Amount:          creditAmount,
+		Money:           float64(amount),
+		TradeNo:         tradeNo,
+		PaymentMethod:   model.PaymentMethodPromptPay,
+		PaymentProvider: model.PaymentProviderPromptPay,
+		CreateTime:      time.Now().Unix(),
+		Status:          common.TopUpStatusPending,
+	}
+	if err := topUp.Insert(); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	message := buildPromptPayNotification(tradeNo, userID, amount, creditAmount, bankFrom)
+	go notifyTelegramPromptPay(paymentSetting, tradeNo, message, slip.Filename, slipBytes)
+
+	common.ApiSuccess(c, gin.H{
+		"trade_no": tradeNo,
+		"status":   common.TopUpStatusPending,
+	})
+}
+
+func RequestOtherPaymentTopUp(c *gin.Context) {
+	paymentSetting := operation_setting.GetPaymentSetting()
+	if !operation_setting.IsPaymentComplianceConfirmed() || !paymentSetting.OtherPaymentEnabled {
+		common.ApiErrorMsg(c, "Other payment is not enabled")
+		return
+	}
+
+	amount, err := strconv.ParseInt(strings.TrimSpace(c.PostForm("amount")), 10, 64)
+	if err != nil || amount <= 0 {
+		common.ApiErrorMsg(c, "Invalid amount")
+		return
+	}
+	if amount < int64(paymentSetting.OtherPaymentMinTopUp) {
+		common.ApiErrorMsg(c, fmt.Sprintf("Minimum top-up is %d LAK", int64(paymentSetting.OtherPaymentMinTopUp)))
+		return
+	}
+
+	methodID := strings.TrimSpace(c.PostForm("method_id"))
+	method, ok := findOtherPaymentMethod(methodID)
+	if !ok {
+		common.ApiErrorMsg(c, "Payment method is not available")
+		return
+	}
+
+	bankFrom := strings.TrimSpace(c.PostForm("bank_from"))
+	if bankFrom == "" {
+		bankFrom = method.BankName
+	}
+
+	slip, err := c.FormFile("slip")
+	if err != nil {
+		common.ApiErrorMsg(c, "Slip file is required")
+		return
+	}
+
+	creditAmount := int64(decimal.NewFromInt(amount).Mul(decimal.NewFromFloat(paymentSetting.OtherPaymentRate)).IntPart())
+	if creditAmount <= 0 {
+		common.ApiErrorMsg(c, "Invalid credit rate")
+		return
+	}
+
+	userID := c.GetInt("id")
+	tradeNo := fmt.Sprintf("LAO%dNO%s%d", userID, common.GetRandomString(6), time.Now().Unix())
+	_, slipBytes, err := saveTopupSlip(tradeNo, slip)
+	if err != nil {
+		common.ApiErrorMsg(c, "Failed to save slip: "+err.Error())
+		return
+	}
+
+	topUp := &model.TopUp{
+		UserId:          userID,
+		Amount:          creditAmount,
+		Money:           float64(amount),
+		TradeNo:         tradeNo,
+		PaymentMethod:   model.PaymentMethodOtherManual + ":" + method.Name,
+		PaymentProvider: model.PaymentProviderOtherManual,
+		CreateTime:      time.Now().Unix(),
+		Status:          common.TopUpStatusPending,
+	}
+	if err := topUp.Insert(); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	message := buildOtherPaymentNotification(tradeNo, userID, amount, creditAmount, method, bankFrom)
+	go notifyTelegramOtherPayment(paymentSetting, tradeNo, message, slip.Filename, slipBytes)
+	go notifyLineOtherPayment(paymentSetting, message)
+
+	common.ApiSuccess(c, gin.H{
+		"trade_no": tradeNo,
+		"status":   common.TopUpStatusPending,
+	})
+}
+
+func OtherPaymentTelegramWebhook(c *gin.Context) {
+	var update otherPaymentTelegramUpdate
+	if err := c.ShouldBindJSON(&update); err != nil || update.Message == nil {
+		common.ApiSuccess(c, nil)
+		return
+	}
+
+	botToken, ok := telegramApprovalBot(update.Message.Chat.ID)
+	if !ok || c.Query("secret") != telegramTopupWebhookSecret(botToken) {
+		c.Status(http.StatusUnauthorized)
+		return
+	}
+	if !isTelegramGroupAdmin(botToken, update.Message.Chat.ID, update.Message.From.ID) {
+		c.Status(http.StatusForbidden)
+		return
+	}
+
+	tradeNo := parseOtherPaymentConfirmText(update.Message.Text)
+	if tradeNo == "" && strings.TrimSpace(update.Message.Text) == "1" && update.Message.ReplyToMessage != nil {
+		if value, ok := otherPaymentApprovalMessages.Load(otherPaymentApprovalKey(update.Message.Chat.ID, update.Message.ReplyToMessage.MessageID)); ok {
+			tradeNo, _ = value.(string)
+		}
+		if tradeNo == "" {
+			tradeNo = tradeNoFromTelegramCaption(update.Message.ReplyToMessage.Caption)
+		}
+	}
+
+	if tradeNo != "" {
+		if err := confirmOtherPaymentTrade(tradeNo, c.ClientIP()); err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		go sendTelegramApprovalResult(
+			botToken,
+			update.Message.Chat.ID,
+			update.Message.MessageID,
+			tradeNo,
+		)
+	}
+	common.ApiSuccess(c, nil)
+}
+
+func OtherPaymentLineWebhook(c *gin.Context) {
+	paymentSetting := operation_setting.GetPaymentSetting()
+	if paymentSetting.OtherPaymentConfirmSecret == "" || c.Query("secret") != paymentSetting.OtherPaymentConfirmSecret {
+		c.Status(http.StatusUnauthorized)
+		return
+	}
+
+	var payload struct {
+		Events []struct {
+			Message struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"message"`
+		} `json:"events"`
+	}
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		common.ApiSuccess(c, nil)
+		return
+	}
+	for _, event := range payload.Events {
+		if event.Message.Type != "text" {
+			continue
+		}
+		if tradeNo := parseOtherPaymentConfirmText(event.Message.Text); tradeNo != "" {
+			if err := confirmOtherPaymentTrade(tradeNo, c.ClientIP()); err != nil {
+				common.ApiError(c, err)
+				return
+			}
+		}
+	}
+	common.ApiSuccess(c, nil)
 }
 
 func GetEpayClient() *epay.Client {

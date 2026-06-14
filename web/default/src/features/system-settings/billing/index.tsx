@@ -21,6 +21,7 @@ import type { BillingSettings } from '../types'
 import {
   BILLING_DEFAULT_SECTION,
   getBillingSectionContent,
+  getBillingSectionMeta,
 } from './section-registry.tsx'
 
 const defaultBillingSettings: BillingSettings = {
@@ -66,6 +67,38 @@ const defaultBillingSettings: BillingSettings = {
   PayMethods: '',
   'payment_setting.amount_options': '',
   'payment_setting.amount_discount': '',
+  'payment_setting.promptpay_enabled': false,
+  'payment_setting.promptpay_mode': 'manual',
+  'payment_setting.promptpay_account_name': '',
+  'payment_setting.promptpay_id': '',
+  'payment_setting.promptpay_bank_name': 'Kasikorn Bank',
+  'payment_setting.promptpay_rate': 3,
+  'payment_setting.promptpay_min_topup': 20,
+  'payment_setting.promptpay_amount_options': '[50,100,300,500,1000]',
+  'payment_setting.promptpay_slip_provider': 'manual',
+  'payment_setting.promptpay_slip_api_url': '',
+  'payment_setting.promptpay_slip_api_key': '',
+  'payment_setting.promptpay_telegram_enabled': false,
+  'payment_setting.promptpay_telegram_bot_secret': '',
+  'payment_setting.promptpay_telegram_chat_id': '',
+  'payment_setting.promptpay_line_enabled': false,
+  'payment_setting.promptpay_line_access_secret': '',
+  'payment_setting.promptpay_line_group_id': '',
+  'payment_setting.promptpay_transaction_export': true,
+  'payment_setting.other_payment_enabled': true,
+  'payment_setting.other_payment_currency': 'LAK',
+  'payment_setting.other_payment_rate': 1,
+  'payment_setting.other_payment_min_topup': 30000,
+  'payment_setting.other_payment_amount_options': '[30000,50000,100000]',
+  'payment_setting.other_payment_methods':
+    '[{"id":"bcel","name":"BCEL","bank_name":"BCEL","account_name":"","account_number":"","qr_image_url":"","note":"","enabled":true},{"id":"ldb","name":"LDB","bank_name":"Lao Development Bank","account_name":"","account_number":"","qr_image_url":"","note":"","enabled":true},{"id":"jdb","name":"JDB","bank_name":"Joint Development Bank","account_name":"","account_number":"","qr_image_url":"","note":"","enabled":true}]',
+  'payment_setting.other_payment_telegram_enabled': false,
+  'payment_setting.other_payment_telegram_bot_secret': '',
+  'payment_setting.other_payment_telegram_chat_id': '',
+  'payment_setting.other_payment_line_enabled': false,
+  'payment_setting.other_payment_line_access_secret': '',
+  'payment_setting.other_payment_line_group_id': '',
+  'payment_setting.other_payment_confirm_secret': '',
   'payment_setting.compliance_confirmed': false,
   'payment_setting.compliance_terms_version': '',
   'payment_setting.compliance_confirmed_at': 0,
@@ -96,18 +129,11 @@ const defaultBillingSettings: BillingSettings = {
   WaffoNotifyUrl: '',
   WaffoReturnUrl: '',
   WaffoPayMethods: '[]',
-  WaffoPancakeEnabled: false,
-  WaffoPancakeSandbox: false,
   WaffoPancakeMerchantID: '',
   WaffoPancakePrivateKey: '',
-  WaffoPancakeWebhookPublicKey: '',
-  WaffoPancakeWebhookTestKey: '',
+  WaffoPancakeReturnURL: '',
   WaffoPancakeStoreID: '',
   WaffoPancakeProductID: '',
-  WaffoPancakeReturnURL: '',
-  WaffoPancakeCurrency: 'USD',
-  WaffoPancakeUnitPrice: 1,
-  WaffoPancakeMinTopUp: 1,
   'checkin_setting.enabled': false,
   'checkin_setting.min_quota': 1000,
   'checkin_setting.max_quota': 10000,
@@ -120,6 +146,7 @@ export function BillingSettings() {
       defaultSettings={defaultBillingSettings}
       defaultSection={BILLING_DEFAULT_SECTION}
       getSectionContent={getBillingSectionContent}
+      getSectionMeta={getBillingSectionMeta}
     />
   )
 }

@@ -50,11 +50,18 @@ const getGroupDefaults = (settings: BillingSettings) => ({
     settings['group_ratio_setting.group_special_usable_group'],
 })
 
+const getPromptPayMode = (mode: string) =>
+  mode === 'automatic' || mode === 'both' ? mode : 'manual'
+
+const getPromptPaySlipProvider = (provider: string) =>
+  provider === 'slipok' || provider === 'slipmate' || provider === 'custom'
+    ? provider
+    : 'manual'
+
 const BILLING_SECTIONS = [
   {
     id: 'quota',
     titleKey: 'Quota Settings',
-    descriptionKey: 'Configure user quota allocation and rewards',
     build: (settings: BillingSettings) => (
       <QuotaSettingsSection
         defaultValues={{
@@ -81,7 +88,6 @@ const BILLING_SECTIONS = [
   {
     id: 'currency',
     titleKey: 'Currency & Display',
-    descriptionKey: 'Configure currency conversion and quota display options',
     build: (settings: BillingSettings) => (
       <PricingSection
         defaultValues={{
@@ -105,11 +111,9 @@ const BILLING_SECTIONS = [
   {
     id: 'model-pricing',
     titleKey: 'Model Pricing',
-    descriptionKey: 'Configure model pricing ratios and tool prices',
     build: (settings: BillingSettings) => (
       <RatioSettingsCard
         titleKey='Model Pricing'
-        descriptionKey='Configure model pricing ratios and tool prices'
         modelDefaults={getModelDefaults(settings)}
         groupDefaults={getGroupDefaults(settings)}
         toolPricesDefault={settings['tool_price_setting.prices']}
@@ -120,11 +124,9 @@ const BILLING_SECTIONS = [
   {
     id: 'group-pricing',
     titleKey: 'Group Pricing',
-    descriptionKey: 'Configure group ratios and group-specific pricing rules',
     build: (settings: BillingSettings) => (
       <RatioSettingsCard
         titleKey='Group Pricing'
-        descriptionKey='Configure group ratios and group-specific pricing rules'
         modelDefaults={getModelDefaults(settings)}
         groupDefaults={getGroupDefaults(settings)}
         toolPricesDefault={settings['tool_price_setting.prices']}
@@ -135,7 +137,6 @@ const BILLING_SECTIONS = [
   {
     id: 'payment',
     titleKey: 'Payment Gateway',
-    descriptionKey: 'Configure payment gateway integrations',
     build: (settings: BillingSettings) => (
       <PaymentSettingsSection
         defaultValues={{
@@ -148,6 +149,64 @@ const BILLING_SECTIONS = [
           PayMethods: settings.PayMethods,
           AmountOptions: settings['payment_setting.amount_options'],
           AmountDiscount: settings['payment_setting.amount_discount'],
+          PromptPayEnabled: settings['payment_setting.promptpay_enabled'],
+          PromptPayMode: getPromptPayMode(
+            settings['payment_setting.promptpay_mode']
+          ),
+          PromptPayAccountName:
+            settings['payment_setting.promptpay_account_name'],
+          PromptPayId: settings['payment_setting.promptpay_id'],
+          PromptPayBankName: settings['payment_setting.promptpay_bank_name'],
+          PromptPayRate: settings['payment_setting.promptpay_rate'],
+          PromptPayMinTopUp: settings['payment_setting.promptpay_min_topup'],
+          PromptPayAmountOptions:
+            settings['payment_setting.promptpay_amount_options'],
+          PromptPaySlipProvider: getPromptPaySlipProvider(
+            settings['payment_setting.promptpay_slip_provider']
+          ),
+          PromptPaySlipApiURL:
+            settings['payment_setting.promptpay_slip_api_url'],
+          PromptPaySlipApiKey:
+            settings['payment_setting.promptpay_slip_api_key'],
+          PromptPayTelegramEnabled:
+            settings['payment_setting.promptpay_telegram_enabled'],
+          PromptPayTelegramBotSecret:
+            settings['payment_setting.promptpay_telegram_bot_secret'],
+          PromptPayTelegramChatId:
+            settings['payment_setting.promptpay_telegram_chat_id'],
+          PromptPayLineEnabled:
+            settings['payment_setting.promptpay_line_enabled'],
+          PromptPayLineAccessSecret:
+            settings['payment_setting.promptpay_line_access_secret'],
+          PromptPayLineGroupId:
+            settings['payment_setting.promptpay_line_group_id'],
+          PromptPayTransactionExport:
+            settings['payment_setting.promptpay_transaction_export'],
+          OtherPaymentEnabled:
+            settings['payment_setting.other_payment_enabled'],
+          OtherPaymentCurrency:
+            settings['payment_setting.other_payment_currency'],
+          OtherPaymentRate: settings['payment_setting.other_payment_rate'],
+          OtherPaymentMinTopUp:
+            settings['payment_setting.other_payment_min_topup'],
+          OtherPaymentAmountOptions:
+            settings['payment_setting.other_payment_amount_options'],
+          OtherPaymentMethods:
+            settings['payment_setting.other_payment_methods'],
+          OtherPaymentTelegramEnabled:
+            settings['payment_setting.other_payment_telegram_enabled'],
+          OtherPaymentTelegramBotSecret:
+            settings['payment_setting.other_payment_telegram_bot_secret'],
+          OtherPaymentTelegramChatId:
+            settings['payment_setting.other_payment_telegram_chat_id'],
+          OtherPaymentLineEnabled:
+            settings['payment_setting.other_payment_line_enabled'],
+          OtherPaymentLineAccessSecret:
+            settings['payment_setting.other_payment_line_access_secret'],
+          OtherPaymentLineGroupId:
+            settings['payment_setting.other_payment_line_group_id'],
+          OtherPaymentConfirmSecret:
+            settings['payment_setting.other_payment_confirm_secret'],
           StripeApiSecret: settings.StripeApiSecret,
           StripeWebhookSecret: settings.StripeWebhookSecret,
           StripePriceId: settings.StripePriceId,
@@ -177,20 +236,12 @@ const BILLING_SECTIONS = [
           WaffoPayMethods: settings.WaffoPayMethods ?? '[]',
         }}
         waffoPancakeDefaultValues={{
-          WaffoPancakeEnabled: settings.WaffoPancakeEnabled ?? false,
-          WaffoPancakeSandbox: settings.WaffoPancakeSandbox ?? false,
           WaffoPancakeMerchantID: settings.WaffoPancakeMerchantID ?? '',
           WaffoPancakePrivateKey: settings.WaffoPancakePrivateKey ?? '',
-          WaffoPancakeWebhookPublicKey:
-            settings.WaffoPancakeWebhookPublicKey ?? '',
-          WaffoPancakeWebhookTestKey: settings.WaffoPancakeWebhookTestKey ?? '',
-          WaffoPancakeStoreID: settings.WaffoPancakeStoreID ?? '',
-          WaffoPancakeProductID: settings.WaffoPancakeProductID ?? '',
           WaffoPancakeReturnURL: settings.WaffoPancakeReturnURL ?? '',
-          WaffoPancakeCurrency: settings.WaffoPancakeCurrency ?? 'USD',
-          WaffoPancakeUnitPrice: settings.WaffoPancakeUnitPrice ?? 1,
-          WaffoPancakeMinTopUp: settings.WaffoPancakeMinTopUp ?? 1,
         }}
+        waffoPancakeProvisionedStoreID={settings.WaffoPancakeStoreID ?? ''}
+        waffoPancakeProvisionedProductID={settings.WaffoPancakeProductID ?? ''}
         complianceDefaults={{
           confirmed: settings['payment_setting.compliance_confirmed'] ?? false,
           termsVersion:
@@ -204,7 +255,6 @@ const BILLING_SECTIONS = [
   {
     id: 'checkin',
     titleKey: 'Check-in Rewards',
-    descriptionKey: 'Configure daily check-in rewards for users',
     build: (settings: BillingSettings) => (
       <CheckinSettingsSection
         defaultValues={{
@@ -233,3 +283,4 @@ export const BILLING_SECTION_IDS = billingRegistry.sectionIds
 export const BILLING_DEFAULT_SECTION = billingRegistry.defaultSection
 export const getBillingSectionNavItems = billingRegistry.getSectionNavItems
 export const getBillingSectionContent = billingRegistry.getSectionContent
+export const getBillingSectionMeta = billingRegistry.getSectionMeta

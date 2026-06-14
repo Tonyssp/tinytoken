@@ -21,13 +21,14 @@ import { useTranslation } from 'react-i18next'
 import {
   IconDiscord,
   IconGithub,
+  IconGoogle,
   IconLinuxDo,
   IconWeChat,
 } from '@/assets/brand-icons'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { useOAuthLogin } from '../hooks/use-oauth-login'
-import type { SystemStatus } from '../types'
+import type { CustomOAuthProviderInfo, SystemStatus } from '../types'
 
 type OAuthProvidersProps = {
   status: SystemStatus | null
@@ -43,6 +44,16 @@ type ProviderButton = {
   onClick: () => void
   icon?: ReactNode
   disabled?: boolean
+}
+
+function getCustomProviderIcon(provider: CustomOAuthProviderInfo) {
+  const key = `${provider.icon || ''} ${provider.slug || ''} ${provider.name || ''}`.toLowerCase()
+  if (key.includes('google')) return <IconGoogle className='h-4 w-4' />
+  if (key.includes('github')) return <IconGithub className='h-4 w-4' />
+  if (key.includes('discord')) return <IconDiscord className='h-4 w-4' />
+  if (key.includes('linuxdo')) return <IconLinuxDo className='h-4 w-4' />
+  if (key.includes('wechat')) return <IconWeChat className='h-4 w-4' />
+  return undefined
 }
 
 export function OAuthProviders({
@@ -66,6 +77,14 @@ export function OAuthProviders({
   } = useOAuthLogin(status)
 
   const providerButtons: ProviderButton[] = []
+  const oidcAuthorizationEndpoint = String(
+    status?.oidc_authorization_endpoint ??
+      status?.data?.oidc_authorization_endpoint ??
+      ''
+  )
+  const isGoogleOIDC = oidcAuthorizationEndpoint.includes(
+    'accounts.google.com'
+  )
 
   if (status?.wechat_login && onWeChatLogin) {
     providerButtons.push({
@@ -99,8 +118,9 @@ export function OAuthProviders({
   if (status?.oidc_enabled) {
     providerButtons.push({
       key: 'oidc',
-      label: t('Continue with OIDC'),
+      label: isGoogleOIDC ? t('Continue with Google') : t('Continue with OIDC'),
       onClick: handleOIDCLogin,
+      icon: isGoogleOIDC ? <IconGoogle className='h-4 w-4' /> : undefined,
     })
   }
 
@@ -122,13 +142,15 @@ export function OAuthProviders({
   }
 
   // Custom OAuth providers
-  const customProviders = status?.custom_oauth_providers
+  const customProviders =
+    status?.custom_oauth_providers ?? status?.data?.custom_oauth_providers
   if (customProviders && customProviders.length > 0) {
     for (const provider of customProviders) {
       providerButtons.push({
         key: `custom-${provider.slug}`,
         label: t('Continue with {{name}}', { name: provider.name }),
         onClick: () => handleCustomOAuthLogin(provider),
+        icon: getCustomProviderIcon(provider),
       })
     }
   }

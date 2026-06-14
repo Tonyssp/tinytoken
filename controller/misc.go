@@ -3,6 +3,7 @@ package controller
 import (
 	"encoding/json"
 	"fmt"
+	"html"
 	"net/http"
 	"strings"
 
@@ -87,6 +88,9 @@ func GetStatus(c *gin.Context) {
 		"chats":                         setting.Chats,
 		"demo_site_enabled":             operation_setting.DemoSiteEnabled,
 		"self_use_mode_enabled":         operation_setting.SelfUseModeEnabled,
+		"register_enabled":              common.RegisterEnabled,
+		"password_login_enabled":        common.PasswordLoginEnabled,
+		"password_register_enabled":     common.PasswordRegisterEnabled,
 		"default_use_auto_group":        setting.DefaultUseAutoGroup,
 
 		"usd_exchange_rate": operation_setting.USDExchangeRate,
@@ -283,10 +287,69 @@ func SendEmailVerification(c *gin.Context) {
 	}
 	code := common.GenerateVerificationCode(6)
 	common.RegisterVerificationCodeWithKey(email, code, common.EmailVerificationPurpose)
-	subject := fmt.Sprintf("%s邮箱验证邮件", common.SystemName)
-	content := fmt.Sprintf("<p>您好，你正在进行%s邮箱验证。</p>"+
-		"<p>您的验证码为: <strong>%s</strong></p>"+
-		"<p>验证码 %d 分钟内有效，如果不是本人操作，请忽略。</p>", common.SystemName, code, common.VerificationValidMinutes)
+	subject := fmt.Sprintf("%s Email Verification Code", common.SystemName)
+	content := fmt.Sprintf(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TinyToken Verification</title>
+</head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,Helvetica,sans-serif;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+    Your TinyToken verification code is %s.
+  </div>
+  <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" border="0" style="width:100%%;background:#f5f5f5;">
+    <tr>
+      <td align="center" style="padding:40px 16px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%%;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;">
+          <tr>
+            <td style="background:#9b5db9;background-image:linear-gradient(135deg,#8F5BC0 0%%,#A05FB7 30%%,#C76181 70%%,#E67A63 100%%);padding:36px 48px;">
+              <h1 style="margin:0;color:#ffffff;font-size:34px;line-height:42px;font-weight:700;">
+                Email verification code
+              </h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:48px;color:#222222;">
+              <p style="margin:0 0 25px;font-size:20px;line-height:30px;">
+                Hello %s,
+              </p>
+              <p style="margin:0 0 30px;font-size:18px;line-height:28px;color:#444444;">
+                Your verification code is:
+              </p>
+              <div style="margin:45px 0;text-align:center;">
+                <span style="font-size:52px;line-height:64px;font-weight:700;letter-spacing:14px;color:#333333;">
+                  %s
+                </span>
+              </div>
+              <p style="margin:0 0 20px;font-size:18px;line-height:28px;color:#444444;">
+                This code expires in <strong>%d minutes</strong>.
+              </p>
+              <p style="margin:0;font-size:18px;line-height:28px;color:#444444;">
+                If you did not request this code, please ignore this email.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 48px 48px;">
+              <div style="background:#fafafa;border-radius:10px;padding:24px;color:#999999;font-size:14px;line-height:22px;text-align:center;">
+                This email was sent by TinyToken.<br>
+                Please do not reply directly.
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+		code,
+		html.EscapeString(localPart),
+		code,
+		common.VerificationValidMinutes,
+	)
 	err := common.SendEmail(subject, email, content)
 	if err != nil {
 		common.ApiError(c, err)

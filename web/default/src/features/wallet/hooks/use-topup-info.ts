@@ -185,6 +185,9 @@ export function useTopupInfo() {
           response.data.stripe_min_topup
         ),
         amount_options: parseAmountOptions(response.data.amount_options),
+        promptpay_amount_options: parseAmountOptions(
+          response.data.promptpay_amount_options
+        ),
         discount: parseDiscountMap(response.data.discount),
         creem_products: parseCreemProducts(response.data.creem_products),
         waffo_pay_methods: parseWaffoPayMethods(
@@ -194,7 +197,17 @@ export function useTopupInfo() {
 
       setTopupInfo(processedData)
 
-      if (processedData.amount_options.length > 0) {
+      if (
+        processedData.enable_promptpay_topup &&
+        processedData.promptpay_amount_options &&
+        processedData.promptpay_amount_options.length > 0
+      ) {
+        const promptpayPresets = mergePresetAmounts(
+          processedData.promptpay_amount_options,
+          {}
+        )
+        setPresetAmounts(promptpayPresets)
+      } else if (processedData.amount_options.length > 0) {
         const customPresets = mergePresetAmounts(
           processedData.amount_options,
           processedData.discount || {}

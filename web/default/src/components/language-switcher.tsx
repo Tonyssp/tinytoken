@@ -34,6 +34,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
+const LANGUAGE_SELECTED_KEY = 'new-api-interface-language-selected'
+
 export function LanguageSwitcher() {
   const { i18n, t } = useTranslation()
   const user = useAuthStore((s) => s.auth.user)
@@ -41,6 +43,7 @@ export function LanguageSwitcher() {
 
   const handleChangeLanguage = useCallback(
     async (code: string) => {
+      window.localStorage.setItem(LANGUAGE_SELECTED_KEY, 'true')
       await i18n.changeLanguage(code)
       if (user) {
         try {

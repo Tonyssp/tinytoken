@@ -133,6 +133,10 @@ export function Wallet(props: WalletProps) {
   // Initialize topup amount when topup info is loaded
   useEffect(() => {
     if (topupInfo && topupAmount === 0) {
+      if (topupInfo.enable_promptpay_topup) {
+        return
+      }
+
       const minTopup = getMinTopupAmount(topupInfo)
       setTopupAmount(minTopup)
 
@@ -261,9 +265,6 @@ export function Wallet(props: WalletProps) {
     <>
       <SectionPageLayout>
         <SectionPageLayout.Title>{t('Wallet')}</SectionPageLayout.Title>
-        <SectionPageLayout.Description>
-          {t('Manage your balance and payment methods')}
-        </SectionPageLayout.Description>
         <SectionPageLayout.Content>
           <div className='mx-auto flex w-full max-w-7xl flex-col gap-4 sm:gap-5'>
             <WalletStatsCard user={user} loading={userLoading} />
@@ -312,6 +313,8 @@ export function Wallet(props: WalletProps) {
               <SubscriptionPlansCard
                 topupInfo={topupInfo}
                 onAvailabilityChange={handleSubscriptionAvailabilityChange}
+                userQuota={user?.quota}
+                onPurchaseSuccess={fetchUser}
               />
             </div>
 

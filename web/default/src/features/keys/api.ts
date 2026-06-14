@@ -42,7 +42,7 @@ export async function getApiKeys(
 // Search API keys by keyword or token (with pagination)
 export async function searchApiKeys(
   params: SearchApiKeysParams
-): Promise<{ success: boolean; message?: string; data?: ApiKey[] }> {
+): Promise<GetApiKeysResponse> {
   const { keyword = '', token = '', p, size } = params
   const queryParams = new URLSearchParams()
   if (keyword) queryParams.set('keyword', keyword)
@@ -114,4 +114,165 @@ export async function fetchTokenKeysBatch(ids: number[]): Promise<{
 }> {
   const res = await api.post('/api/token/batch/keys', { ids })
   return res.data
+}
+
+// Test whether an API key can authenticate against the OpenAI-compatible models endpoint
+export async function testApiKeyConnection(token: string): Promise<{
+  success: boolean
+  message?: string
+  modelCount?: number
+}> {
+  try {
+    const res = await fetch('/v1/models', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    if (!res.ok) {
+      return {
+        success: false,
+        message: `HTTP ${res.status}`,
+      }
+    }
+
+    const data = (await res.json()) as { data?: unknown[] }
+    return {
+      success: true,
+      modelCount: Array.isArray(data.data) ? data.data.length : undefined,
+    }
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : undefined,
+    }
+  }
+}
+
+function resolveModelsEndpoint(endpoint: string): string {
+  const trimmed = endpoint.trim()
+  if (!trimmed) return '/v1/models'
+  return trimmed
+    .replace(/\/chat\/completions\/?$/, '/models')
+    .replace(/\/completions\/?$/, '/models')
+}
+
+export async function fetchApiKeyTestModels(
+  token: string,
+  endpoint = '/v1/chat/completions'
+): Promise<{
+  success: boolean
+  message?: string
+  models: string[]
+}> {
+  try {
+    const res = await fetch(resolveModelsEndpoint(endpoint), {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    if (!res.ok) {
+      return {
+        success: false,
+        message: `HTTP ${res.status}`,
+        models: [],
+      }
+    }
+
+    const data = (await res.json()) as {
+      data?: Array<{ id?: unknown; name?: unknown; model?: unknown }>
+    }
+    const models = Array.isArray(data.data)
+      ? data.data
+          .map((item) => item.id ?? item.name ?? item.model)
+          .filter((value): value is string => typeof value === 'string')
+      : []
+
+    return {
+      success: true,
+      models,
+    }
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : undefined,
+      models: [],
+    }
+  }
+}
+
+export async function sendApiKeyTestMessage(params: {
+  token: string
+  endpoint: string
+  model: string
+  message: string
+}): Promise<{
+  success: boolean
+  message?: string
+  responseText?: string
+  raw?: unknown
+  elapsedMs?: number
+}> {
+  const startedAt = performance.now()
+
+  try {
+    const res = await fetch(params.endpoint.trim() || '/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${params.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: params.model,
+        messages: [
+          {
+            role: 'user',
+            content: params.message,
+          },
+        ],
+        temperature: 0.2,
+        max_tokens: 200,
+      }),
+    })
+    const elapsedMs = Math.round(performance.now() - startedAt)
+    const data = await res.json().catch(() => null)
+
+    if (!res.ok) {
+      const errorMessage =
+        data && typeof data === 'object' && 'error' in data
+          ? JSON.stringify((data as { error: unknown }).error)
+          : `HTTP ${res.status}`
+      return {
+        success: false,
+        message: errorMessage,
+        raw: data,
+        elapsedMs,
+      }
+    }
+
+    const responseText =
+      data &&
+      typeof data === 'object' &&
+      'choices' in data &&
+      Array.isArray((data as { choices?: unknown }).choices)
+        ? (
+            (data as { choices: Array<{ message?: { content?: unknown } }> })
+              .choices[0]?.message?.content ?? ''
+          )
+        : ''
+
+    return {
+      success: true,
+      responseText: typeof responseText === 'string' ? responseText : '',
+      raw: data,
+      elapsedMs,
+    }
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : undefined,
+      elapsedMs: Math.round(performance.now() - startedAt),
+    }
+  }
 }

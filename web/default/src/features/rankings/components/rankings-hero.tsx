@@ -43,15 +43,12 @@ export function RankingsHero(props: RankingsHeroProps) {
   return (
     <section className='space-y-5'>
       <div className='space-y-2'>
-        <p className='text-muted-foreground text-xs font-medium tracking-widest uppercase'>
-          {t('Leaderboards')}
-        </p>
         <h1 className='text-[clamp(1.75rem,4vw,2.5rem)] leading-[1.15] font-bold tracking-tight'>
           {t('Rankings')}
         </h1>
-        <p className='text-muted-foreground/80 max-w-2xl text-sm'>
+        <p className='text-muted-foreground/80 max-w-2xl whitespace-pre-line text-sm'>
           {t(
-            'Discover the most-used models and rising vendors on the platform, updated from live usage data.'
+            'Discover the most-used models and rising vendors on the platform, updated from real time usage data.'
           )}
         </p>
       </div>

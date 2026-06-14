@@ -38,6 +38,7 @@ import type {
   WaffoPaymentResponse,
   WaffoPancakePaymentRequest,
   WaffoPancakePaymentResponse,
+  ManualTopupResponse,
 } from './types'
 
 // ============================================================================
@@ -164,6 +165,26 @@ export async function requestWaffoPancakePayment(
 ): Promise<WaffoPancakePaymentResponse> {
   const res = await api.post('/api/user/waffo-pancake/pay', request, {
     skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+export async function requestOtherManualTopup(
+  request: FormData
+): Promise<ManualTopupResponse> {
+  const res = await api.post('/api/user/topup/other', request, {
+    skipBusinessError: true,
+    headers: { 'Content-Type': 'multipart/form-data' },
+  } as Record<string, unknown>)
+  return res.data
+}
+
+export async function requestPromptPayManualTopup(
+  request: FormData
+): Promise<ManualTopupResponse> {
+  const res = await api.post('/api/user/topup/promptpay', request, {
+    skipBusinessError: true,
+    headers: { 'Content-Type': 'multipart/form-data' },
   } as Record<string, unknown>)
   return res.data
 }

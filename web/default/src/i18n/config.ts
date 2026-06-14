@@ -20,28 +20,34 @@ import i18n from 'i18next'
 import LanguageDetector from 'i18next-browser-languagedetector'
 import { initReactI18next } from 'react-i18next'
 import en from './locales/en.json'
-import fr from './locales/fr.json'
-import ja from './locales/ja.json'
-import ru from './locales/ru.json'
+import th from './locales/th.json'
 import vi from './locales/vi.json'
 import zh from './locales/zh.json'
 
 export const resources = {
+  th,
   en,
   zh,
-  fr,
-  ru,
-  ja,
   vi,
 } as const
+
+const LANGUAGE_STORAGE_KEY = 'i18nextLng'
+const LANGUAGE_SELECTED_KEY = 'new-api-interface-language-selected'
+
+if (typeof window !== 'undefined') {
+  const hasExplicitLanguage = window.localStorage.getItem(LANGUAGE_SELECTED_KEY)
+  if (!hasExplicitLanguage) {
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, 'th')
+  }
+}
 
 i18n
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({
     resources,
-    fallbackLng: 'en',
-    supportedLngs: ['en', 'zh', 'fr', 'ru', 'ja', 'vi'],
+    fallbackLng: 'th',
+    supportedLngs: ['th', 'en', 'zh', 'vi'],
     load: 'languageOnly', // Convert zh-CN -> zh
     nsSeparator: false, // Allow literal colons in keys (e.g., URLs, labels)
     debug: import.meta.env.DEV,
@@ -49,7 +55,7 @@ i18n
       escapeValue: false, // not needed for react as it escapes by default
     },
     detection: {
-      order: ['localStorage', 'navigator'],
+      order: ['localStorage'],
       caches: ['localStorage'],
     },
   })

@@ -21,17 +21,15 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { getUserModels } from '@/lib/api'
+import {
+  resolveTinyTokenApiBaseUrl,
+  resolveTinyTokenAppBaseUrl,
+} from '@/lib/tinytoken-endpoint'
 import { Button } from '@/components/ui/button'
 import { ComboboxInput } from '@/components/ui/combobox-input'
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Dialog } from '@/components/dialog'
 
 const APP_CONFIGS = {
   claude: {
@@ -58,7 +56,7 @@ const APP_CONFIGS = {
 
 type AppType = keyof typeof APP_CONFIGS
 
-function getServerAddress(): string {
+function getStatusServerAddress(): string {
   try {
     const raw = localStorage.getItem('status')
     if (raw) {
@@ -77,8 +75,10 @@ function buildCCSwitchURL(
   models: Record<string, string>,
   apiKey: string
 ): string {
-  const serverAddress = getServerAddress()
-  const endpoint = app === 'codex' ? serverAddress + '/v1' : serverAddress
+  const statusServerAddress = getStatusServerAddress()
+  const apiBaseUrl = resolveTinyTokenApiBaseUrl(statusServerAddress)
+  const homepageUrl = resolveTinyTokenAppBaseUrl(statusServerAddress)
+  const endpoint = app === 'codex' ? apiBaseUrl + '/v1' : apiBaseUrl
   const params = new URLSearchParams()
   params.set('resource', 'provider')
   params.set('app', app)
@@ -88,7 +88,7 @@ function buildCCSwitchURL(
   for (const [k, v] of Object.entries(models)) {
     if (v) params.set(k, v)
   }
-  params.set('homepage', serverAddress)
+  params.set('homepage', homepageUrl)
   params.set('enabled', 'true')
   return `ccswitch://v1/import?${params.toString()}`
 }
@@ -151,75 +151,78 @@ export function CCSwitchDialog(props: Props) {
   }
 
   return (
-    <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className='sm:max-w-md'>
-        <DialogHeader>
-          <DialogTitle>{t('Import to CC Switch')}</DialogTitle>
-        </DialogHeader>
-
-        <div className='space-y-4'>
-          <div className='space-y-2'>
-            <Label>{t('Application')}</Label>
-            <RadioGroup
-              value={app}
-              onValueChange={handleAppChange}
-              className='flex gap-4'
-            >
-              {(
-                Object.entries(APP_CONFIGS) as [
-                  AppType,
-                  (typeof APP_CONFIGS)[AppType],
-                ][]
-              ).map(([key, cfg]) => (
-                <div key={key} className='flex items-center gap-2'>
-                  <RadioGroupItem value={key} id={`app-${key}`} />
-                  <Label htmlFor={`app-${key}`} className='cursor-pointer'>
-                    {cfg.label}
-                  </Label>
-                </div>
-              ))}
-            </RadioGroup>
-          </div>
-
-          <div className='space-y-2'>
-            <Label>{t('Name')}</Label>
-            <ComboboxInput
-              options={[]}
-              value={name}
-              onValueChange={setName}
-              placeholder={currentConfig.defaultName}
-              emptyText=''
-            />
-          </div>
-
-          {currentConfig.modelFields.map((field) => (
-            <div key={field.key} className='space-y-2'>
-              <Label>
-                {t(field.labelKey)}
-                {field.required && (
-                  <span className='text-destructive ml-0.5'>*</span>
-                )}
-              </Label>
-              <ComboboxInput
-                options={modelOptions}
-                value={models[field.key] || ''}
-                onValueChange={(v) =>
-                  setModels((prev) => ({ ...prev, [field.key]: v }))
-                }
-                placeholder={t('Select or enter model name')}
-                emptyText={t('No models found')}
-              />
-            </div>
-          ))}
-        </div>
-
-        <DialogFooter>
+    <Dialog
+      open={props.open}
+      onOpenChange={props.onOpenChange}
+      title={t('Import to CC Switch')}
+      contentClassName='sm:max-w-md'
+      contentHeight='auto'
+      bodyClassName='space-y-4'
+      footer={
+        <>
           <Button variant='outline' onClick={() => props.onOpenChange(false)}>
             {t('Cancel')}
           </Button>
           <Button onClick={handleSubmit}>{t('Open CC Switch')}</Button>
-        </DialogFooter>
-      </DialogContent>
+        </>
+      }
+    >
+      <div className='space-y-4'>
+        <div className='space-y-2'>
+          <Label>{t('Application')}</Label>
+          <RadioGroup
+            value={app}
+            onValueChange={handleAppChange}
+            className='flex gap-4'
+          >
+            {(
+              Object.entries(APP_CONFIGS) as [
+                AppType,
+                (typeof APP_CONFIGS)[AppType],
+              ][]
+            ).map(([key, cfg]) => (
+              <div key={key} className='flex items-center gap-2'>
+                <RadioGroupItem value={key} id={`app-${key}`} />
+                <Label htmlFor={`app-${key}`} className='cursor-pointer'>
+                  {cfg.label}
+                </Label>
+              </div>
+            ))}
+          </RadioGroup>
+        </div>
+
+        <div className='space-y-2'>
+          <Label>{t('Name')}</Label>
+          <ComboboxInput
+            options={[]}
+            value={name}
+            onValueChange={setName}
+            placeholder={currentConfig.defaultName}
+            emptyText=''
+            allowCustomValue={true}
+          />
+        </div>
+
+        {currentConfig.modelFields.map((field) => (
+          <div key={field.key} className='space-y-2'>
+            <Label>
+              {t(field.labelKey)}
+              {field.required && (
+                <span className='text-destructive ml-0.5'>*</span>
+              )}
+            </Label>
+            <ComboboxInput
+              options={modelOptions}
+              value={models[field.key] || ''}
+              onValueChange={(v) =>
+                setModels((prev) => ({ ...prev, [field.key]: v }))
+              }
+              placeholder={t('Select or enter model name')}
+              emptyText={t('No models found')}
+            />
+          </div>
+        ))}
+      </div>
     </Dialog>
   )
 }

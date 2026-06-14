@@ -176,6 +176,7 @@ export type ModelSettings = {
   'group_ratio_setting.group_special_usable_group': string
   'channel_affinity_setting.enabled': boolean
   'channel_affinity_setting.switch_on_success': boolean
+  'channel_affinity_setting.keep_on_channel_disabled': boolean
   'channel_affinity_setting.max_entries': number
   'channel_affinity_setting.default_ttl_seconds': number
   'channel_affinity_setting.rules': string
@@ -226,6 +227,37 @@ export type BillingSettings = {
   PayMethods: string
   'payment_setting.amount_options': string
   'payment_setting.amount_discount': string
+  'payment_setting.promptpay_enabled': boolean
+  'payment_setting.promptpay_mode': string
+  'payment_setting.promptpay_account_name': string
+  'payment_setting.promptpay_id': string
+  'payment_setting.promptpay_bank_name': string
+  'payment_setting.promptpay_rate': number
+  'payment_setting.promptpay_min_topup': number
+  'payment_setting.promptpay_amount_options': string
+  'payment_setting.promptpay_slip_provider': string
+  'payment_setting.promptpay_slip_api_url': string
+  'payment_setting.promptpay_slip_api_key': string
+  'payment_setting.promptpay_telegram_enabled': boolean
+  'payment_setting.promptpay_telegram_bot_secret': string
+  'payment_setting.promptpay_telegram_chat_id': string
+  'payment_setting.promptpay_line_enabled': boolean
+  'payment_setting.promptpay_line_access_secret': string
+  'payment_setting.promptpay_line_group_id': string
+  'payment_setting.promptpay_transaction_export': boolean
+  'payment_setting.other_payment_enabled': boolean
+  'payment_setting.other_payment_currency': string
+  'payment_setting.other_payment_rate': number
+  'payment_setting.other_payment_min_topup': number
+  'payment_setting.other_payment_amount_options': string
+  'payment_setting.other_payment_methods': string
+  'payment_setting.other_payment_telegram_enabled': boolean
+  'payment_setting.other_payment_telegram_bot_secret': string
+  'payment_setting.other_payment_telegram_chat_id': string
+  'payment_setting.other_payment_line_enabled': boolean
+  'payment_setting.other_payment_line_access_secret': string
+  'payment_setting.other_payment_line_group_id': string
+  'payment_setting.other_payment_confirm_secret': string
   'payment_setting.compliance_confirmed': boolean
   'payment_setting.compliance_terms_version': string
   'payment_setting.compliance_confirmed_at': number
@@ -256,18 +288,13 @@ export type BillingSettings = {
   WaffoNotifyUrl: string
   WaffoReturnUrl: string
   WaffoPayMethods: string
-  WaffoPancakeEnabled: boolean
-  WaffoPancakeSandbox: boolean
   WaffoPancakeMerchantID: string
   WaffoPancakePrivateKey: string
-  WaffoPancakeWebhookPublicKey: string
-  WaffoPancakeWebhookTestKey: string
+  WaffoPancakeReturnURL: string
+  // Bound by the operator through the catalog flow in the admin Pancake
+  // section (saved via /api/option/waffo-pancake/save).
   WaffoPancakeStoreID: string
   WaffoPancakeProductID: string
-  WaffoPancakeReturnURL: string
-  WaffoPancakeCurrency: string
-  WaffoPancakeUnitPrice: number
-  WaffoPancakeMinTopUp: number
   'checkin_setting.enabled': boolean
   'checkin_setting.min_quota': number
   'checkin_setting.max_quota': number

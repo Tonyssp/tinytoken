@@ -51,9 +51,29 @@ export type WaffoPancakePaymentResponse = ApiResponse<
       session_id?: string
       expires_at?: number | string
       order_id?: string
+      // Self-service session token + expiry — surfaced by the backend so
+      // future flows (refund / cancel from new-api's own UI) can use them
+      // without re-issuing checkout. Not consumed by the current handler.
+      token?: string
+      token_expires_at?: number | string
     }
   | string
 >
+export type ManualTopupResponse = ApiResponse<{
+  trade_no: string
+  status: string
+}>
+
+export interface OtherPaymentMethod {
+  id: string
+  name: string
+  bank_name: string
+  account_name: string
+  account_number: string
+  qr_image_url?: string
+  note?: string
+  enabled?: boolean
+}
 
 /**
  * Creem product configuration
@@ -145,6 +165,38 @@ export interface TopupInfo {
   enable_waffo_pancake_topup?: boolean
   /** Minimum topup amount for Waffo Pancake */
   waffo_pancake_min_topup?: number
+  /** Whether Thai PromptPay / bank transfer topup is enabled */
+  enable_promptpay_topup?: boolean
+  /** PromptPay verification mode */
+  promptpay_mode?: 'manual' | 'automatic' | 'both' | string
+  /** Receiving account holder name */
+  promptpay_account_name?: string
+  /** PromptPay phone, national ID, or tax ID */
+  promptpay_id?: string
+  /** Receiving bank display name */
+  promptpay_bank_name?: string
+  /** Credits granted per THB */
+  promptpay_rate?: number
+  /** Minimum PromptPay transfer amount in THB */
+  promptpay_min_topup?: number
+  /** Suggested PromptPay transfer amounts in THB */
+  promptpay_amount_options?: number[]
+  /** Slip verification provider shown to members */
+  promptpay_slip_provider?: string
+  /** Whether transaction export is enabled */
+  promptpay_transaction_export?: boolean
+  /** Whether Laos manual payment is enabled */
+  enable_other_payment_topup?: boolean
+  /** Other payment currency, fixed to LAK for this design */
+  other_payment_currency?: string
+  /** Credits granted per LAK */
+  other_payment_rate?: number
+  /** Minimum Laos transfer amount in LAK */
+  other_payment_min_topup?: number
+  /** Suggested Laos transfer amounts in LAK */
+  other_payment_amount_options?: number[]
+  /** Laos bank/manual payment methods */
+  other_payment_methods?: OtherPaymentMethod[]
   /** Whether redemption code usage is enabled */
   enable_redemption?: boolean
   /** Whether compliance confirmation has been completed */

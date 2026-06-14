@@ -1,0 +1,9 @@
+tunnel: 17373d25-3603-4894-aed1-64a80b6845e6
+credentials-file: C:\Users\Tony\.cloudflared\17373d25-3603-4894-aed1-64a80b6845e6.json
+
+ingress:
+  - hostname: api.tinyapi.org
+    service: http://localhost:3000
+  - hostname: tinyapi.org
+    service: http://localhost:3001
+  - service: http_status:404

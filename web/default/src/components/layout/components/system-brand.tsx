@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
+import { DEFAULT_LOGO } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 import { useStatus } from '@/hooks/use-status'
 import { useSystemConfig } from '@/hooks/use-system-config'
@@ -47,10 +48,14 @@ type SystemBrandProps = {
 export function SystemBrand(props: SystemBrandProps) {
   const { t } = useTranslation()
   const { status } = useStatus()
-  const { logo } = useSystemConfig()
+  const { logo, systemName } = useSystemConfig()
 
   const variant = props.variant ?? 'sidebar'
-  const name = status?.system_name || props.defaultName || 'New API'
+  const statusName =
+    status?.system_name && status.system_name !== 'New API'
+      ? status.system_name
+      : undefined
+  const name = statusName || systemName || props.defaultName || 'TinyToken'
   const version =
     status?.version || props.defaultVersion || t('Unknown version')
 
@@ -68,6 +73,9 @@ export function SystemBrand(props: SystemBrandProps) {
           <img
             src={logo}
             alt={t('Logo')}
+            onError={(event) => {
+              event.currentTarget.src = DEFAULT_LOGO
+            }}
             className='size-full rounded-md object-cover'
           />
         </div>
@@ -88,6 +96,9 @@ export function SystemBrand(props: SystemBrandProps) {
             <img
               src={logo}
               alt={t('Logo')}
+              onError={(event) => {
+                event.currentTarget.src = DEFAULT_LOGO
+              }}
               className='size-full rounded-lg object-cover'
             />
           </div>

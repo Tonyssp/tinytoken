@@ -29,8 +29,11 @@ import i18next from 'i18next'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/stores/auth-store'
 import { getStatus } from '@/lib/api'
+import { installBuildMetadata } from '@/lib/build-metadata'
+import { DEFAULT_LOGO, DEFAULT_SYSTEM_NAME } from '@/lib/constants'
 import '@/lib/dayjs'
 import { applyFaviconToDom } from '@/lib/dom-utils'
+import { initializeFrontendCache } from '@/lib/frontend-cache'
 import { handleServerError } from '@/lib/handle-server-error'
 import { DirectionProvider } from './context/direction-provider'
 import { FontProvider } from './context/font-provider'
@@ -43,6 +46,8 @@ import './styles/index.css'
 
 // Ensure VChart theme is initialized before any chart mounts (prevents white default theme flash)
 // VChart theme is driven by our ThemeProvider (html.light/html.dark) via per-chart `theme` prop.
+initializeFrontendCache()
+installBuildMetadata()
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -113,12 +118,22 @@ const rootElement = document.getElementById('root')!
 ;(function initSystemBranding() {
   try {
     if (typeof window === 'undefined' || typeof document === 'undefined') return
+    const normalizeName = (name?: string) =>
+      !name || name === 'New API' ? DEFAULT_SYSTEM_NAME : name
+    const normalizeLogo = (logo?: string) =>
+      !logo ||
+      logo === '/logo.png' ||
+      logo === '/tinytoken-logo.svg' ||
+      logo.includes('imgur.com/a/')
+        ? DEFAULT_LOGO
+        : logo
     const apply = (name: string) => {
-      document.title = name
+      const displayName = normalizeName(name)
+      document.title = displayName
       const metaTitle = document.querySelector(
         'meta[name="title"]'
       ) as HTMLMetaElement | null
-      if (metaTitle) metaTitle.setAttribute('content', name)
+      if (metaTitle) metaTitle.setAttribute('content', displayName)
     }
     // Cache-first
     try {
@@ -126,7 +141,7 @@ const rootElement = document.getElementById('root')!
       if (saved) {
         const s = JSON.parse(saved)
         if (s?.system_name) apply(s.system_name)
-        if (s?.logo) applyFaviconToDom(s.logo)
+        if (s?.logo) applyFaviconToDom(normalizeLogo(s.logo))
       }
     } catch {
       /* empty */
@@ -142,7 +157,7 @@ const rootElement = document.getElementById('root')!
             /* empty */
           }
         }
-        if (s?.logo) applyFaviconToDom(s.logo as string)
+        if (s?.logo) applyFaviconToDom(normalizeLogo(s.logo as string))
       })
       .catch(() => {
         /* empty */

@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
+import { DEFAULT_LOGO } from '@/lib/constants'
 import { useSystemConfig } from '@/hooks/use-system-config'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -42,6 +43,9 @@ export function AuthLayout({ children }: AuthLayoutProps) {
             <img
               src={logo}
               alt={t('Logo')}
+              onError={(event) => {
+                event.currentTarget.src = DEFAULT_LOGO
+              }}
               className='h-8 w-8 rounded-full object-cover'
             />
           )}

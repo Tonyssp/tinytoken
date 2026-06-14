@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useMemo } from 'react'
+import { resolveTinyTokenApiBaseUrl } from '@/lib/tinytoken-endpoint'
 import { useStatus } from '@/hooks/use-status'
 import type { SystemStatus } from '@/features/auth/types'
 import {
@@ -45,11 +46,11 @@ function extractServerAddress(status: SystemStatus | null) {
     (status?.data as Record<string, unknown> | undefined)?.serverAddress
 
   if (fromStatus && typeof fromStatus === 'string') {
-    return fromStatus
+    return resolveTinyTokenApiBaseUrl(fromStatus)
   }
 
   if (typeof window !== 'undefined') {
-    return window.location.origin
+    return resolveTinyTokenApiBaseUrl(window.location.origin)
   }
 
   return ''

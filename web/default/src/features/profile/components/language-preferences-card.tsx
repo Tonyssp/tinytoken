@@ -43,6 +43,8 @@ type LanguagePreferencesCardProps = {
   onProfileUpdate: () => void
 }
 
+const LANGUAGE_SELECTED_KEY = 'new-api-interface-language-selected'
+
 export function LanguagePreferencesCard(props: LanguagePreferencesCardProps) {
   const { t, i18n } = useTranslation()
   const { auth } = useAuthStore()
@@ -67,6 +69,7 @@ export function LanguagePreferencesCard(props: LanguagePreferencesCardProps) {
     const previousLanguage = currentLanguage
     setCurrentLanguage(nextLanguage)
     setSaving(true)
+    window.localStorage.setItem(LANGUAGE_SELECTED_KEY, 'true')
     await i18n.changeLanguage(nextLanguage)
 
     try {

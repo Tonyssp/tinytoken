@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { DEFAULT_LOGO } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 
 interface HeaderLogoProps {
@@ -41,6 +42,11 @@ export function HeaderLogo({
     <img
       src={src}
       alt={alt}
+      onError={(event) => {
+        event.currentTarget.src = DEFAULT_LOGO
+        event.currentTarget.classList.remove('opacity-0')
+        event.currentTarget.classList.add('opacity-100')
+      }}
       className={cn(
         'h-6 w-6 rounded-full transition-opacity duration-200',
         !loading && logoLoaded ? 'opacity-100' : 'opacity-0',

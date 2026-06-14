@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { SettingsControlGroup } from '../../../components/settings-form-layout'
 import { OAUTH_PRESETS, type CustomOAuthFormValues } from '../types'
 
 type PresetSelectorProps = {
@@ -39,6 +40,7 @@ export function PresetSelector(props: PresetSelectorProps) {
   const { t } = useTranslation()
   const [selectedPreset, setSelectedPreset] = useState<string>('')
   const [baseUrl, setBaseUrl] = useState<string>('')
+  const currentPreset = OAUTH_PRESETS.find((p) => p.key === selectedPreset)
 
   const handlePresetChange = (presetKey: string) => {
     setSelectedPreset(presetKey)
@@ -65,8 +67,11 @@ export function PresetSelector(props: PresetSelectorProps) {
       shouldDirty: true,
     })
 
-    // Apply base URL if already entered
-    if (baseUrl) {
+    // Some providers such as Google use fixed public endpoints and do not need a base URL.
+    if (!preset.needsBaseUrl) {
+      setBaseUrl('')
+      applyEndpoints(preset, '')
+    } else if (baseUrl) {
       applyEndpoints(preset, baseUrl)
     }
   }
@@ -77,6 +82,7 @@ export function PresetSelector(props: PresetSelectorProps) {
 
     const preset = OAUTH_PRESETS.find((p) => p.key === selectedPreset)
     if (!preset) return
+    if (!preset.needsBaseUrl) return
 
     applyEndpoints(preset, url)
   }
@@ -102,7 +108,7 @@ export function PresetSelector(props: PresetSelectorProps) {
   }
 
   return (
-    <div className='space-y-3 rounded-lg border border-dashed p-4'>
+    <SettingsControlGroup className='space-y-3 border-dashed'>
       <p className='text-sm font-medium'>{t('Quick Setup from Preset')}</p>
       <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
         <div className='space-y-1.5'>
@@ -134,12 +140,17 @@ export function PresetSelector(props: PresetSelectorProps) {
         <div className='space-y-1.5'>
           <Label>{t('Base URL')}</Label>
           <Input
-            placeholder={t('https://your-server.example.com')}
+            placeholder={
+              currentPreset?.needsBaseUrl === false
+                ? t('Not needed for this preset')
+                : t('https://your-server.example.com')
+            }
             value={baseUrl}
+            disabled={currentPreset?.needsBaseUrl === false}
             onChange={(e) => handleBaseUrlChange(e.target.value)}
           />
         </div>
       </div>
-    </div>
+    </SettingsControlGroup>
   )
 }

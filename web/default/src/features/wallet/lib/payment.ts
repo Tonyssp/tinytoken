@@ -94,6 +94,10 @@ export function getDefaultPaymentType(topupInfo: TopupInfo | null): string {
     return DEFAULT_PAYMENT_TYPE
   }
 
+  if (topupInfo.enable_promptpay_topup) {
+    return 'promptpay'
+  }
+
   // Return first available payment method or default
   if (topupInfo.pay_methods?.length > 0) {
     return topupInfo.pay_methods[0].type
@@ -120,6 +124,10 @@ export function getDefaultPaymentType(topupInfo: TopupInfo | null): string {
 export function getMinTopupAmount(topupInfo: TopupInfo | null): number {
   if (!topupInfo) {
     return DEFAULT_MIN_TOPUP
+  }
+
+  if (topupInfo.enable_promptpay_topup) {
+    return topupInfo.promptpay_min_topup || DEFAULT_MIN_TOPUP
   }
 
   if (topupInfo.enable_online_topup) {

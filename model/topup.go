@@ -29,6 +29,9 @@ const (
 	PaymentMethodCreem        = "creem"
 	PaymentMethodWaffo        = "waffo"
 	PaymentMethodWaffoPancake = "waffo_pancake"
+	PaymentMethodBalance      = "balance"
+	PaymentMethodPromptPay    = "promptpay_manual"
+	PaymentMethodOtherManual  = "other_manual"
 )
 
 const (
@@ -37,6 +40,9 @@ const (
 	PaymentProviderCreem        = "creem"
 	PaymentProviderWaffo        = "waffo"
 	PaymentProviderWaffoPancake = "waffo_pancake"
+	PaymentProviderBalance      = "balance"
+	PaymentProviderPromptPay    = "promptpay_manual"
+	PaymentProviderOtherManual  = "other_manual"
 )
 
 var (

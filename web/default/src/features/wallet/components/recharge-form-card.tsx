@@ -17,8 +17,21 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useState, useEffect } from 'react'
-import { Gift, ExternalLink, Loader2, Receipt, WalletCards } from 'lucide-react'
+import {
+  Banknote,
+  CheckCircle2,
+  Copy,
+  Gift,
+  ExternalLink,
+  Loader2,
+  QrCode,
+  Receipt,
+  UploadCloud,
+  WalletCards,
+} from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -35,6 +48,11 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import {
+  isApiSuccess,
+  requestOtherManualTopup,
+  requestPromptPayManualTopup,
+} from '../api'
+import {
   formatCurrency,
   getDiscountLabel,
   getPaymentIcon,
@@ -49,6 +67,83 @@ import type {
   WaffoPayMethod,
 } from '../types'
 import { CreemProductsSection } from './creem-products-section'
+
+const BANK_OPTION_GROUPS = [
+  {
+    label: 'Thai banks',
+    options: [
+      { value: 'bangkok', label: 'กรุงเทพ (Bangkok Bank)' },
+      { value: 'kasikorn', label: 'กสิกรไทย (Kasikorn Bank)' },
+      { value: 'krungthai', label: 'กรุงไทย (Krungthai Bank)' },
+      { value: 'ttb', label: 'ทหารไทยธนชาต (TMBThanachart Bank)' },
+      { value: 'scb', label: 'ไทยพาณิชย์ (Siam Commercial Bank)' },
+      { value: 'krungsri', label: 'กรุงศรีอยุธยา (Bank of Ayudhya)' },
+      { value: 'gsb', label: 'ออมสิน (Government Savings Bank)' },
+      { value: 'kkp', label: 'เกียรตินาคินภัทร (Kiatnakin Phatra Bank)' },
+    ],
+  },
+]
+
+function formatPromptPayField(id: string, value: string) {
+  return `${id}${value.length.toString().padStart(2, '0')}${value}`
+}
+
+function crc16Ccitt(payload: string) {
+  let crc = 0xffff
+
+  for (let i = 0; i < payload.length; i++) {
+    crc ^= payload.charCodeAt(i) << 8
+    for (let bit = 0; bit < 8; bit++) {
+      crc = crc & 0x8000 ? (crc << 1) ^ 0x1021 : crc << 1
+      crc &= 0xffff
+    }
+  }
+
+  return crc.toString(16).toUpperCase().padStart(4, '0')
+}
+
+function normalizePromptPayTarget(value: string) {
+  const digits = value.replace(/\D/g, '')
+  if (!digits) return null
+
+  if (digits.length >= 15) {
+    return { type: '03', value: digits }
+  }
+
+  if (digits.length === 13) {
+    return { type: '02', value: digits }
+  }
+
+  if (digits.length === 10 && digits.startsWith('0')) {
+    return { type: '01', value: `0066${digits.slice(1)}` }
+  }
+
+  if (digits.length === 9 && /^[689]/.test(digits)) {
+    return { type: '01', value: `0066${digits}` }
+  }
+
+  return { type: '01', value: digits }
+}
+
+function createPromptPayPayload(promptPayId: string, amount: number) {
+  const target = normalizePromptPayTarget(promptPayId)
+  if (!target || !Number.isFinite(amount) || amount <= 0) return ''
+
+  const merchantAccountInfo =
+    formatPromptPayField('00', 'A000000677010111') +
+    formatPromptPayField(target.type, target.value)
+
+  const payloadWithoutCrc =
+    formatPromptPayField('00', '01') +
+    formatPromptPayField('01', '12') +
+    formatPromptPayField('29', merchantAccountInfo) +
+    formatPromptPayField('53', '764') +
+    formatPromptPayField('54', amount.toFixed(2)) +
+    formatPromptPayField('58', 'TH') +
+    '6304'
+
+  return `${payloadWithoutCrc}${crc16Ccitt(payloadWithoutCrc)}`
+}
 
 interface RechargeFormCardProps {
   topupInfo: TopupInfo | null
@@ -110,15 +205,36 @@ export function RechargeFormCard({
   enableWaffoPancakeTopup,
 }: RechargeFormCardProps) {
   const { t } = useTranslation()
-  const [localAmount, setLocalAmount] = useState(topupAmount.toString())
+  const [localAmount, setLocalAmount] = useState('')
+  const [activeTopupPanel, setActiveTopupPanel] = useState<'thai' | 'other'>(
+    'thai'
+  )
+  const [selectedPromptPayBank, setSelectedPromptPayBank] = useState('')
+  const [promptPaySlipName, setPromptPaySlipName] = useState('')
+  const [promptPaySlipFile, setPromptPaySlipFile] = useState<File | null>(null)
+  const [submittingPromptPay, setSubmittingPromptPay] = useState(false)
+  const [otherAmount, setOtherAmount] = useState('')
+  const [selectedOtherPreset, setSelectedOtherPreset] = useState<number | null>(
+    null
+  )
+  const [selectedOtherMethodId, setSelectedOtherMethodId] = useState('')
+  const [otherBankFrom, setOtherBankFrom] = useState('')
+  const [otherSlipName, setOtherSlipName] = useState('')
+  const [otherSlipFile, setOtherSlipFile] = useState<File | null>(null)
+  const [submittingOtherPayment, setSubmittingOtherPayment] = useState(false)
 
   useEffect(() => {
-    setLocalAmount(topupAmount.toString())
-  }, [topupAmount])
+    if (topupInfo?.enable_promptpay_topup && topupAmount === 0) {
+      setLocalAmount('')
+      return
+    }
+
+    setLocalAmount(topupAmount > 0 ? topupAmount.toString() : '')
+  }, [topupAmount, topupInfo?.enable_promptpay_topup])
 
   const handleAmountChange = (value: string) => {
     setLocalAmount(value)
-    const numValue = parseInt(value) || 0
+    const numValue = value.trim() === '' ? 0 : parseInt(value) || 0
     if (numValue >= 0) {
       onTopupAmountChange(numValue)
     }
@@ -127,15 +243,163 @@ export function RechargeFormCard({
   const hasConfigurableTopup =
     topupInfo?.enable_online_topup ||
     topupInfo?.enable_stripe_topup ||
+    topupInfo?.enable_promptpay_topup ||
+    topupInfo?.enable_other_payment_topup ||
     enableWaffoTopup ||
     enableWaffoPancakeTopup
   const hasAnyTopup = hasConfigurableTopup || enableCreemTopup
+  const promptPayEnabled = !!topupInfo?.enable_promptpay_topup
+  const otherPaymentEnabled = !!topupInfo?.enable_other_payment_topup
+  const promptPayId = topupInfo?.promptpay_id?.trim() || ''
+  const promptPayRate = Number(topupInfo?.promptpay_rate || 0)
+  const promptPayCredits = topupAmount * promptPayRate
+  const promptPayMode = topupInfo?.promptpay_mode || 'manual'
+  const promptPayProvider = topupInfo?.promptpay_slip_provider || 'manual'
+  const promptPayQrPayload = createPromptPayPayload(promptPayId, topupAmount)
+  const legacyTopupEnabled =
+    topupInfo?.enable_online_topup ||
+    topupInfo?.enable_stripe_topup ||
+    enableWaffoTopup ||
+    enableWaffoPancakeTopup
   const hasStandardPaymentMethods =
     Array.isArray(topupInfo?.pay_methods) && topupInfo.pay_methods.length > 0
   const hasWaffoPaymentMethods =
     Array.isArray(waffoPayMethods) && waffoPayMethods.length > 0
   const minTopup = getMinTopupAmount(topupInfo)
   const redemptionEnabled = topupInfo?.enable_redemption !== false
+  const promptPayAmountTooLow =
+    promptPayEnabled && localAmount.trim() !== '' && topupAmount < minTopup
+  const canSubmitPromptPay =
+    !!promptPaySlipFile &&
+    !!selectedPromptPayBank &&
+    topupAmount >= minTopup &&
+    topupAmount > 0
+  const otherPaymentMethods = topupInfo?.other_payment_methods || []
+  const selectedOtherMethod = otherPaymentMethods.find(
+    (method) => method.id === selectedOtherMethodId
+  )
+  const otherPaymentCurrency = topupInfo?.other_payment_currency || 'LAK'
+  const otherPaymentRate = Number(topupInfo?.other_payment_rate || 0)
+  const otherPaymentMinTopup = Number(topupInfo?.other_payment_min_topup || 0)
+  const otherPaymentAmount =
+    otherAmount.trim() === '' ? 0 : parseInt(otherAmount) || 0
+  const otherPaymentCredits = otherPaymentAmount * otherPaymentRate
+  const otherPaymentAmountTooLow =
+    otherAmount.trim() !== '' &&
+    otherPaymentMinTopup > 0 &&
+    otherPaymentAmount < otherPaymentMinTopup
+  const otherPaymentPresets = topupInfo?.other_payment_amount_options?.length
+    ? topupInfo.other_payment_amount_options
+    : [30000, 50000, 100000]
+  const canSubmitOtherPayment =
+    !!selectedOtherMethodId &&
+    !!otherSlipFile &&
+    otherPaymentAmount > 0 &&
+    !otherPaymentAmountTooLow
+
+  useEffect(() => {
+    if (!promptPayEnabled && otherPaymentEnabled) {
+      setActiveTopupPanel('other')
+    }
+  }, [promptPayEnabled, otherPaymentEnabled])
+
+  useEffect(() => {
+    if (!selectedOtherMethodId && otherPaymentMethods.length > 0) {
+      setSelectedOtherMethodId(otherPaymentMethods[0].id)
+    }
+  }, [otherPaymentMethods, selectedOtherMethodId])
+
+  const copyPromptPayId = async () => {
+    if (!promptPayId) {
+      return
+    }
+
+    await navigator.clipboard.writeText(promptPayId)
+    toast.success(t('Copied PromptPay ID'))
+  }
+
+  const handlePromptPaySubmit = async () => {
+    if (!canSubmitPromptPay || !promptPaySlipFile) {
+      return
+    }
+
+    const formData = new FormData()
+    formData.append('amount', topupAmount.toString())
+    formData.append('bank_from', selectedPromptPayBank)
+    formData.append('slip', promptPaySlipFile)
+
+    try {
+      setSubmittingPromptPay(true)
+      const response = await requestPromptPayManualTopup(formData)
+      if (isApiSuccess(response)) {
+        toast.success(
+          t('ส่งคำขอเติมเครดิตแล้ว กรุณารอแอดมินตรวจสอบสลิป')
+        )
+        setPromptPaySlipFile(null)
+        setPromptPaySlipName('')
+        setSelectedPromptPayBank('')
+      } else {
+        toast.error(response.message || t('Failed to submit top-up request'))
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t('Failed to submit top-up request')
+      )
+    } finally {
+      setSubmittingPromptPay(false)
+    }
+  }
+
+  const handleOtherPresetSelect = (amount: number) => {
+    setOtherAmount(amount.toString())
+    setSelectedOtherPreset(amount)
+  }
+
+  const handleOtherAmountChange = (value: string) => {
+    setOtherAmount(value)
+    setSelectedOtherPreset(null)
+  }
+
+  const handleOtherPaymentSubmit = async () => {
+    if (!canSubmitOtherPayment || !otherSlipFile) {
+      return
+    }
+
+    const formData = new FormData()
+    formData.append('amount', otherPaymentAmount.toString())
+    formData.append('method_id', selectedOtherMethodId)
+    formData.append(
+      'bank_from',
+      otherBankFrom || selectedOtherMethod?.bank_name || ''
+    )
+    formData.append('slip', otherSlipFile)
+
+    try {
+      setSubmittingOtherPayment(true)
+      const response = await requestOtherManualTopup(formData)
+      if (isApiSuccess(response)) {
+        toast.success(
+          t(
+            'Top-up request sent. Admin can approve it from Telegram, LINE, or order history.'
+          )
+        )
+        setOtherSlipFile(null)
+        setOtherSlipName('')
+      } else {
+        toast.error(response.message || t('Failed to submit top-up request'))
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t('Failed to submit top-up request')
+      )
+    } finally {
+      setSubmittingOtherPayment(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -209,7 +473,440 @@ export function RechargeFormCard({
       {/* Online Topup Section */}
       {hasAnyTopup ? (
         <div className='space-y-4 sm:space-y-6'>
-          {hasConfigurableTopup && (
+          {promptPayEnabled && otherPaymentEnabled && (
+            <div className='grid gap-2 sm:grid-cols-2'>
+              <Button
+                type='button'
+                variant={activeTopupPanel === 'thai' ? 'default' : 'outline'}
+                className='h-11 justify-start gap-2'
+                onClick={() => setActiveTopupPanel('thai')}
+              >
+                <Banknote className='h-4 w-4' />
+                {t('Bank transfer / PromptPay')}
+              </Button>
+              <Button
+                type='button'
+                variant={activeTopupPanel === 'other' ? 'default' : 'outline'}
+                className='h-11 justify-start gap-2'
+                onClick={() => setActiveTopupPanel('other')}
+              >
+                <WalletCards className='h-4 w-4' />
+                {t('Other Payment')}
+              </Button>
+            </div>
+          )}
+
+          {promptPayEnabled && activeTopupPanel === 'thai' && (
+            <div className='space-y-4'>
+              <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+                <div className='flex items-center gap-2'>
+                  <Banknote className='h-4 w-4' />
+                  <Label className='text-base font-semibold'>
+                    {t('Bank transfer / PromptPay')}
+                  </Label>
+                </div>
+                <div className='text-muted-foreground flex items-center gap-2 text-sm'>
+                  <CheckCircle2 className='h-4 w-4 text-green-600' />
+                  {promptPayMode === 'manual' || promptPayProvider === 'manual'
+                    ? t('Manual review')
+                    : t('Automatic slip checking')}
+                </div>
+              </div>
+
+              {presetAmounts.length > 0 && (
+                <div className='grid grid-cols-2 gap-2 sm:grid-cols-5'>
+                  {presetAmounts.map((preset) => (
+                    <Button
+                      key={preset.value}
+                      type='button'
+                      variant={
+                        selectedPreset === preset.value ? 'default' : 'outline'
+                      }
+                      onClick={() => onSelectPreset(preset)}
+                      className='h-10'
+                    >
+                      ฿{formatNumber(preset.value)}
+                    </Button>
+                  ))}
+                </div>
+              )}
+
+              <div className='grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]'>
+                <div className='space-y-4 rounded-lg border p-4'>
+                  <div className='space-y-2'>
+                    <Label htmlFor='promptpay-amount'>
+                      {t('Transfer amount (THB)')}
+                    </Label>
+                    <Input
+                      id='promptpay-amount'
+                      type='number'
+                      value={localAmount}
+                      onChange={(e) => handleAmountChange(e.target.value)}
+                      min={minTopup}
+                      placeholder={t('Minimum {{amount}} THB', {
+                        amount: minTopup,
+                      })}
+                      className='h-11 text-lg'
+                    />
+                    <p className='text-muted-foreground text-sm'>
+                      {t('Estimated credit: {{amount}}', {
+                        amount: formatNumber(promptPayCredits || 0),
+                      })}
+                    </p>
+                    {promptPayAmountTooLow && (
+                      <p className='text-sm font-medium text-amber-600'>
+                        {t('Minimum transfer amount is {{amount}} THB', {
+                          amount: minTopup,
+                        })}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className='grid gap-4 sm:grid-cols-[220px_minmax(0,1fr)]'>
+                    <div className='flex min-h-[220px] items-center justify-center rounded-lg border bg-white p-4'>
+                      {promptPayQrPayload ? (
+                        <QRCodeSVG
+                          value={promptPayQrPayload}
+                          title={t('PromptPay QR')}
+                          size={210}
+                          level='M'
+                          marginSize={2}
+                          className='h-full max-h-[210px] w-full max-w-[210px]'
+                        />
+                      ) : (
+                        <div className='text-muted-foreground flex flex-col items-center gap-2 text-center text-sm'>
+                          <QrCode className='h-10 w-10' />
+                          {t('Enter PromptPay ID in admin settings to show QR')}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className='bg-muted/30 space-y-3 rounded-lg border p-4'>
+                      <div className='grid grid-cols-[110px_minmax(0,1fr)] gap-2 text-sm'>
+                        <span className='text-muted-foreground'>
+                          {t('PromptPay ID')}
+                        </span>
+                        <div className='flex min-w-0 items-center gap-2'>
+                          <span className='truncate font-mono font-semibold'>
+                            {promptPayId || '-'}
+                          </span>
+                          {promptPayId && (
+                            <Button
+                              type='button'
+                              variant='outline'
+                              size='sm'
+                              className='h-7 px-2'
+                              onClick={copyPromptPayId}
+                            >
+                              <Copy className='h-3.5 w-3.5' />
+                            </Button>
+                          )}
+                        </div>
+                        <span className='text-muted-foreground'>
+                          {t('Receiving bank')}
+                        </span>
+                        <span className='font-medium'>
+                          {topupInfo?.promptpay_bank_name || '-'}
+                        </span>
+                        <span className='text-muted-foreground'>
+                          {t('Receiving account name')}
+                        </span>
+                        <span className='font-medium'>
+                          {topupInfo?.promptpay_account_name || '-'}
+                        </span>
+                      </div>
+                      <div className='border-t pt-3 text-sm'>
+                        <p className='text-muted-foreground'>
+                          {t(
+                            'Scan the QR with your bank app, then upload the payment slip below.'
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className='space-y-4 rounded-lg border p-4'>
+                  <div className='space-y-2'>
+                    <Label htmlFor='promptpay-bank'>
+                      {t('Bank you transferred from')}
+                    </Label>
+                    <select
+                      id='promptpay-bank'
+                      value={selectedPromptPayBank}
+                      onChange={(e) => setSelectedPromptPayBank(e.target.value)}
+                      className='border-input bg-background ring-offset-background focus-visible:ring-ring h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none'
+                    >
+                      <option value=''>{t('Select bank')}</option>
+                      {BANK_OPTION_GROUPS.map((group) => (
+                        <optgroup key={group.label} label={t(group.label)}>
+                          {group.options.map((bank) => (
+                            <option key={bank.value} value={bank.label}>
+                              {bank.label}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className='space-y-2'>
+                    <Label htmlFor='promptpay-slip'>
+                      {t('Upload transfer slip')}
+                    </Label>
+                    <label
+                      htmlFor='promptpay-slip'
+                      className='hover:bg-muted/40 flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-4 text-center'
+                    >
+                      <UploadCloud className='text-muted-foreground h-6 w-6' />
+                      <span className='text-sm font-medium'>
+                        {promptPaySlipName || t('Choose slip file')}
+                      </span>
+                      <span className='text-muted-foreground text-xs'>
+                        JPG, PNG, WEBP หรือ PDF ไม่เกิน 5 MB
+                      </span>
+                    </label>
+                    <input
+                      id='promptpay-slip'
+                      type='file'
+                      accept='.jpg,.jpeg,.png,.webp,.pdf'
+                      className='hidden'
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null
+                        setPromptPaySlipFile(file)
+                        setPromptPaySlipName(file?.name || '')
+                      }}
+                    />
+                  </div>
+
+                  <Button
+                    type='button'
+                    className='w-full'
+                    disabled={!canSubmitPromptPay || submittingPromptPay}
+                    onClick={handlePromptPaySubmit}
+                  >
+                    {submittingPromptPay && (
+                      <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                    )}
+                    {t('Submit top-up request')}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {otherPaymentEnabled && activeTopupPanel === 'other' && (
+            <div className='space-y-4'>
+              <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+                <div className='flex items-center gap-2'>
+                  <WalletCards className='h-4 w-4' />
+                  <Label className='text-base font-semibold'>
+                    {t('Other Payment')}
+                  </Label>
+                </div>
+                <div className='text-muted-foreground flex items-center gap-2 text-sm'>
+                  <CheckCircle2 className='h-4 w-4 text-green-600' />
+                  {t('Laos manual manager review')}
+                </div>
+              </div>
+
+              <div className='grid grid-cols-2 gap-2 sm:grid-cols-4'>
+                {otherPaymentPresets.map((amount) => (
+                  <Button
+                    key={amount}
+                    type='button'
+                    variant={
+                      selectedOtherPreset === amount ? 'default' : 'outline'
+                    }
+                    onClick={() => handleOtherPresetSelect(amount)}
+                    className='h-10'
+                  >
+                    ₭{formatNumber(amount)}
+                  </Button>
+                ))}
+              </div>
+
+              <div className='grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]'>
+                <div className='space-y-4 rounded-lg border p-4'>
+                  <div className='space-y-2'>
+                    <Label htmlFor='other-payment-amount'>
+                      {t('Transfer amount (LAK)')}
+                    </Label>
+                    <Input
+                      id='other-payment-amount'
+                      type='number'
+                      value={otherAmount}
+                      onChange={(e) => handleOtherAmountChange(e.target.value)}
+                      min={otherPaymentMinTopup}
+                      placeholder={t('Minimum {{amount}} LAK', {
+                        amount: formatNumber(otherPaymentMinTopup),
+                      })}
+                      className='h-11 text-lg'
+                    />
+                    <p className='text-muted-foreground text-sm'>
+                      {t('Estimated credit: {{amount}}', {
+                        amount: formatNumber(otherPaymentCredits || 0),
+                      })}
+                    </p>
+                    {otherPaymentAmountTooLow && (
+                      <p className='text-sm font-medium text-amber-600'>
+                        {t('Minimum transfer amount is {{amount}} LAK', {
+                          amount: formatNumber(otherPaymentMinTopup),
+                        })}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className='space-y-2'>
+                    <Label htmlFor='other-payment-method'>
+                      {t('Laos payment method')}
+                    </Label>
+                    <select
+                      id='other-payment-method'
+                      value={selectedOtherMethodId}
+                      onChange={(e) => setSelectedOtherMethodId(e.target.value)}
+                      className='border-input bg-background ring-offset-background focus-visible:ring-ring h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none'
+                    >
+                      <option value=''>{t('Select bank')}</option>
+                      {otherPaymentMethods.map((method) => (
+                        <option key={method.id} value={method.id}>
+                          {method.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className='grid gap-4 sm:grid-cols-[220px_minmax(0,1fr)]'>
+                    <div className='flex min-h-[220px] items-center justify-center rounded-lg border bg-white p-4'>
+                      {selectedOtherMethod?.qr_image_url ? (
+                        <img
+                          src={selectedOtherMethod.qr_image_url}
+                          alt={t('Payment QR')}
+                          className='h-full max-h-[210px] w-full max-w-[210px] object-contain'
+                        />
+                      ) : (
+                        <div className='text-muted-foreground flex flex-col items-center gap-2 text-center text-sm'>
+                          <QrCode className='h-10 w-10' />
+                          {t('Payment QR is not configured.')}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className='bg-muted/30 space-y-3 rounded-lg border p-4'>
+                      <div className='grid grid-cols-[120px_minmax(0,1fr)] gap-2 text-sm'>
+                        <span className='text-muted-foreground'>
+                          {t('Currency')}
+                        </span>
+                        <span className='font-semibold'>
+                          {otherPaymentCurrency}
+                        </span>
+                        <span className='text-muted-foreground'>
+                          {t('Bank')}
+                        </span>
+                        <span className='font-medium'>
+                          {selectedOtherMethod?.bank_name || '-'}
+                        </span>
+                        <span className='text-muted-foreground'>
+                          {t('Account name')}
+                        </span>
+                        <span className='font-medium'>
+                          {selectedOtherMethod?.account_name || '-'}
+                        </span>
+                        <span className='text-muted-foreground'>
+                          {t('Account number')}
+                        </span>
+                        <div className='flex min-w-0 items-center gap-2'>
+                          <span className='truncate font-mono font-semibold'>
+                            {selectedOtherMethod?.account_number || '-'}
+                          </span>
+                          {selectedOtherMethod?.account_number && (
+                            <Button
+                              type='button'
+                              variant='outline'
+                              size='sm'
+                              className='h-7 px-2'
+                              onClick={() => {
+                                navigator.clipboard.writeText(
+                                  selectedOtherMethod.account_number
+                                )
+                                toast.success(t('Copied account number'))
+                              }}
+                            >
+                              <Copy className='h-3.5 w-3.5' />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      {selectedOtherMethod?.note && (
+                        <div className='border-t pt-3 text-sm'>
+                          <p className='text-muted-foreground'>
+                            {selectedOtherMethod.note}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className='space-y-4 rounded-lg border p-4'>
+                  <div className='space-y-2'>
+                    <Label htmlFor='other-bank-from'>
+                      {t('Bank you transferred from')}
+                    </Label>
+                    <Input
+                      id='other-bank-from'
+                      value={otherBankFrom}
+                      onChange={(e) => setOtherBankFrom(e.target.value)}
+                      placeholder={t('Optional bank name')}
+                    />
+                  </div>
+
+                  <div className='space-y-2'>
+                    <Label htmlFor='other-slip'>
+                      {t('Upload transfer slip')}
+                    </Label>
+                    <label
+                      htmlFor='other-slip'
+                      className='hover:bg-muted/40 flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-4 text-center'
+                    >
+                      <UploadCloud className='text-muted-foreground h-6 w-6' />
+                      <span className='text-sm font-medium'>
+                        {otherSlipName || t('Choose slip file')}
+                      </span>
+                      <span className='text-muted-foreground text-xs'>
+                        JPG, PNG, WEBP หรือ PDF ไม่เกิน 5 MB
+                      </span>
+                    </label>
+                    <input
+                      id='other-slip'
+                      type='file'
+                      accept='.jpg,.jpeg,.png,.webp,.pdf'
+                      className='hidden'
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null
+                        setOtherSlipFile(file)
+                        setOtherSlipName(file?.name || '')
+                      }}
+                    />
+                  </div>
+
+                  <Button
+                    type='button'
+                    className='w-full'
+                    disabled={!canSubmitOtherPayment || submittingOtherPayment}
+                    onClick={handleOtherPaymentSubmit}
+                  >
+                    {submittingOtherPayment && (
+                      <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                    )}
+                    {t('Submit top-up request')}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {legacyTopupEnabled && (
             <>
               {presetAmounts.length > 0 && (
                 <div className='space-y-2.5 sm:space-y-3'>
@@ -240,7 +937,7 @@ export function RechargeFormCard({
                           className={cn(
                             'hover:border-foreground flex min-h-16 flex-col items-start rounded-lg px-3 py-2.5 text-left whitespace-normal sm:min-h-[72px] sm:p-4',
                             selectedPreset === preset.value
-                              ? 'border-foreground bg-foreground/5'
+                              ? 'border-foreground bg-foreground/5 dark:border-foreground dark:bg-foreground/10'
                               : 'border-muted'
                           )}
                           onClick={() => onSelectPreset(preset)}
@@ -462,7 +1159,9 @@ export function RechargeFormCard({
               id='redemption-code'
               value={redemptionCode}
               onChange={(e) => onRedemptionCodeChange(e.target.value)}
-              placeholder={t('Enter your redemption code')}
+              placeholder={t(
+                'Enter a friend invite code here to redeem points'
+              )}
               className='h-9 min-w-0'
             />
             <Button
