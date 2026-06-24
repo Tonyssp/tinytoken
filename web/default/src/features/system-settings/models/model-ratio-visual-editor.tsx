@@ -85,6 +85,7 @@ type ModelRatioVisualEditorProps = {
   billingExpr: string
   onChange: (field: string, value: string) => void
   onSave: () => void | Promise<void>
+  onDeleteSave: () => void | Promise<void>
   isSaving: boolean
 }
 
@@ -121,6 +122,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
     billingExpr,
     onChange,
     onSave,
+    onDeleteSave,
     isSaving,
   },
   ref
@@ -321,7 +323,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
   )
 
   const handleDelete = useCallback(
-    (name: string) => {
+    async (name: string) => {
       const priceMap = safeJsonParse<Record<string, number>>(modelPrice, {
         fallback: {},
         silent: true,
@@ -399,7 +401,12 @@ const ModelRatioVisualEditorComponent = forwardRef<
         setEditorOpen(false)
         setSheetOpen(false)
       }
-      toast.success(`${t('Deleted successfully')} ${t('Save model prices')}`)
+
+      // React Hook Form updates synchronously, but defer submission until all
+      // pricing maps above have been replaced.
+      await Promise.resolve()
+      await onDeleteSave()
+      toast.success(t('Deleted successfully'))
     },
     [
       modelPrice,
@@ -413,6 +420,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
       billingMode,
       billingExpr,
       onChange,
+      onDeleteSave,
       editData,
       t,
     ]
@@ -793,6 +801,7 @@ export const ModelRatioVisualEditor = memo(
       prevProps.billingExpr === nextProps.billingExpr &&
       prevProps.onChange === nextProps.onChange &&
       prevProps.onSave === nextProps.onSave &&
+      prevProps.onDeleteSave === nextProps.onDeleteSave &&
       prevProps.isSaving === nextProps.isSaving
     )
   }
