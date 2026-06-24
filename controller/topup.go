@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -168,7 +169,8 @@ type AmountRequest struct {
 }
 
 type otherPaymentTelegramUpdate struct {
-	Message *struct {
+	UpdateID int64 `json:"update_id"`
+	Message  *struct {
 		MessageID int    `json:"message_id"`
 		Text      string `json:"text"`
 		From      struct {
@@ -199,10 +201,13 @@ func telegramTopupWebhookSecret(botToken string) string {
 	return fmt.Sprintf("%x", sum[:16])
 }
 
-func ensureTelegramTopupWebhook(botToken string) {
+func ensureTelegramTopupWebhook(botToken string) error {
 	serverAddress := strings.TrimRight(strings.TrimSpace(system_setting.ServerAddress), "/")
-	if botToken == "" || !strings.HasPrefix(serverAddress, "https://") {
-		return
+	if botToken == "" {
+		return errors.New("Telegram bot token is empty")
+	}
+	if !strings.HasPrefix(serverAddress, "https://") {
+		return fmt.Errorf("ServerAddress must use HTTPS for Telegram webhook: %s", serverAddress)
 	}
 
 	webhookURL := fmt.Sprintf(
@@ -217,20 +222,30 @@ func ensureTelegramTopupWebhook(botToken string) {
 	endpoint := fmt.Sprintf("https://api.telegram.org/bot%s/setWebhook", botToken)
 	req, err := http.NewRequest(http.MethodPost, endpoint, strings.NewReader(form.Encode()))
 	if err != nil {
-		common.SysLog("failed to build Telegram webhook request: " + err.Error())
-		return
+		return fmt.Errorf("failed to build Telegram webhook request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := service.GetHttpClient().Do(req)
 	if err != nil {
-		common.SysLog("failed to configure Telegram topup webhook: " + err.Error())
-		return
+		return fmt.Errorf("failed to configure Telegram topup webhook: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		common.SysLog(fmt.Sprintf("Telegram topup webhook returned HTTP %d", resp.StatusCode))
+		return fmt.Errorf("Telegram topup webhook returned HTTP %d", resp.StatusCode)
 	}
+
+	var parsed struct {
+		OK          bool   `json:"ok"`
+		Description string `json:"description"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 64*1024)).Decode(&parsed); err != nil {
+		return fmt.Errorf("failed to decode Telegram webhook response: %w", err)
+	}
+	if !parsed.OK {
+		return fmt.Errorf("Telegram rejected webhook: %s", parsed.Description)
+	}
+	return nil
 }
 
 func telegramApprovalBot(chatID int64) (string, bool) {
@@ -260,7 +275,7 @@ func telegramApprovalBot(chatID int64) (string, bool) {
 	return "", false
 }
 
-func isTelegramGroupAdmin(botToken string, chatID int64, userID int64) bool {
+func isTelegramGroupAdmin(botToken string, chatID int64, userID int64) (bool, error) {
 	endpoint := fmt.Sprintf(
 		"https://api.telegram.org/bot%s/getChatMember?chat_id=%d&user_id=%d",
 		botToken,
@@ -269,21 +284,27 @@ func isTelegramGroupAdmin(botToken string, chatID int64, userID int64) bool {
 	)
 	resp, err := service.GetHttpClient().Get(endpoint)
 	if err != nil {
-		common.SysLog("failed to verify Telegram admin: " + err.Error())
-		return false
+		return false, fmt.Errorf("failed to verify Telegram admin: %w", err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return false, fmt.Errorf("Telegram getChatMember returned HTTP %d", resp.StatusCode)
+	}
 
 	var parsed struct {
-		OK     bool `json:"ok"`
-		Result struct {
+		OK          bool   `json:"ok"`
+		Description string `json:"description"`
+		Result      struct {
 			Status string `json:"status"`
 		} `json:"result"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil || !parsed.OK {
-		return false
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 64*1024)).Decode(&parsed); err != nil {
+		return false, fmt.Errorf("failed to decode Telegram admin response: %w", err)
 	}
-	return parsed.Result.Status == "administrator" || parsed.Result.Status == "creator"
+	if !parsed.OK {
+		return false, fmt.Errorf("Telegram rejected getChatMember: %s", parsed.Description)
+	}
+	return parsed.Result.Status == "administrator" || parsed.Result.Status == "creator", nil
 }
 
 func findOtherPaymentMethod(methodID string) (operation_setting.OtherPaymentMethod, bool) {
@@ -334,7 +355,9 @@ func notifyTelegramManualTopup(enabled bool, botToken string, chatID string, tra
 		return
 	}
 
-	ensureTelegramTopupWebhook(botToken)
+	if err := ensureTelegramTopupWebhook(botToken); err != nil {
+		common.SysLog("failed to configure Telegram topup webhook: " + err.Error())
+	}
 
 	method := "sendDocument"
 	fileField := "document"
@@ -445,7 +468,7 @@ func notifyLineOtherPayment(setting *operation_setting.PaymentSetting, text stri
 
 func buildOtherPaymentNotification(tradeNo string, userID int, amount int64, creditAmount int64, method operation_setting.OtherPaymentMethod, bankFrom string) string {
 	return fmt.Sprintf(
-		"New Laos manual top-up\nTrade: %s\nUser ID: %d\nAmount: %s LAK\nCredit: %d\nMethod: %s\nBank from: %s\n\nTelegram confirm: reply 1 to this message, or send: 1 %s\nLINE confirm: send: 1 %s",
+		"New Laos manual top-up\nTrade: %s\nUser ID: %d\nAmount: %s LAK\nCredit: %d\nMethod: %s\nBank from: %s\n\nTelegram: reply 1 to approve or 2 to reject\nOr send: 1 %s / 2 %s\nLINE confirm: send: 1 %s",
 		tradeNo,
 		userID,
 		formatIntWithCommas(amount),
@@ -454,17 +477,19 @@ func buildOtherPaymentNotification(tradeNo string, userID int, amount int64, cre
 		bankFrom,
 		tradeNo,
 		tradeNo,
+		tradeNo,
 	)
 }
 
 func buildPromptPayNotification(tradeNo string, userID int, amount int64, creditAmount int64, bankFrom string) string {
 	return fmt.Sprintf(
-		"คำขอเติมเครดิต PromptPay ใหม่\nเลขที่รายการ: %s\nUser ID: %d\nยอดโอน: %s บาท\nเครดิตที่จะได้รับ: %d\nธนาคารต้นทาง: %s\n\nตรวจสอบสลิปแล้วตอบ 1 ที่ข้อความนี้เพื่ออนุมัติ\nหรือส่ง: 1 %s",
+		"คำขอเติมเครดิต PromptPay ใหม่\nเลขที่รายการ: %s\nUser ID: %d\nยอดโอน: %s บาท\nเครดิตที่จะได้รับ: %d\nธนาคารต้นทาง: %s\n\nตอบกลับข้อความนี้ด้วย 1 เพื่ออนุมัติ หรือ 2 เพื่อปฏิเสธ\nหรือส่ง: 1 %s / 2 %s",
 		tradeNo,
 		userID,
 		formatIntWithCommas(amount),
 		creditAmount,
 		bankFrom,
+		tradeNo,
 		tradeNo,
 	)
 }
@@ -491,10 +516,40 @@ func confirmOtherPaymentTrade(tradeNo string, callerIp string) error {
 	return model.ManualCompleteTopUp(tradeNo, callerIp)
 }
 
-func parseOtherPaymentConfirmText(text string) string {
+type telegramTopupAction string
+
+const (
+	telegramTopupApprove telegramTopupAction = "approve"
+	telegramTopupReject  telegramTopupAction = "reject"
+)
+
+func parseTelegramTopupCommand(text string) (telegramTopupAction, string, bool) {
 	fields := strings.Fields(strings.TrimSpace(text))
-	if len(fields) >= 2 && (fields[0] == "1" || strings.EqualFold(fields[0], "confirm") || strings.EqualFold(fields[0], "/confirm")) {
-		return fields[1]
+	if len(fields) == 0 {
+		return "", "", false
+	}
+
+	command := strings.ToLower(strings.SplitN(fields[0], "@", 2)[0])
+	var action telegramTopupAction
+	switch command {
+	case "1", "approve", "confirm", "/approve", "/confirm":
+		action = telegramTopupApprove
+	case "2", "reject", "deny", "/reject", "/deny":
+		action = telegramTopupReject
+	default:
+		return "", "", false
+	}
+
+	if len(fields) >= 2 {
+		return action, fields[1], true
+	}
+	return action, "", true
+}
+
+func parseOtherPaymentConfirmText(text string) string {
+	action, tradeNo, ok := parseTelegramTopupCommand(text)
+	if ok && action == telegramTopupApprove {
+		return tradeNo
 	}
 	return ""
 }
@@ -511,21 +566,47 @@ func tradeNoFromTelegramCaption(caption string) string {
 	return ""
 }
 
-func sendTelegramApprovalResult(botToken string, chatID int64, replyToMessageID int, tradeNo string) {
+func sendTelegramCommandMessage(botToken string, chatID int64, replyToMessageID int, text string) {
 	form := url.Values{
 		"chat_id":             {strconv.FormatInt(chatID, 10)},
 		"reply_to_message_id": {strconv.Itoa(replyToMessageID)},
-		"text":                {fmt.Sprintf("อนุมัติรายการ %s สำเร็จ และเติมเครดิตให้ผู้ใช้แล้ว", tradeNo)},
+		"text":                {text},
 	}
 	endpoint := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
 	req, err := http.NewRequest(http.MethodPost, endpoint, strings.NewReader(form.Encode()))
 	if err != nil {
+		common.SysLog("failed to build Telegram command response: " + err.Error())
 		return
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := service.GetHttpClient().Do(req)
-	if err == nil {
-		defer resp.Body.Close()
+	if err != nil {
+		common.SysLog("failed to send Telegram command response: " + err.Error())
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		common.SysLog(fmt.Sprintf("Telegram command response returned HTTP %d", resp.StatusCode))
+	}
+}
+
+func telegramTopupActionLabel(action telegramTopupAction) string {
+	if action == telegramTopupReject {
+		return "ปฏิเสธ"
+	}
+	return "อนุมัติ"
+}
+
+func telegramTopupErrorMessage(action telegramTopupAction, tradeNo string, err error) string {
+	switch {
+	case errors.Is(err, model.ErrTopUpNotFound):
+		return fmt.Sprintf("ไม่พบรายการ %s", tradeNo)
+	case errors.Is(err, model.ErrManualTopUpProviderInvalid):
+		return fmt.Sprintf("รายการ %s ไม่ใช่รายการโอนเงินแบบตรวจสอบโดยแอดมิน", tradeNo)
+	case errors.Is(err, model.ErrTopUpStatusInvalid):
+		return fmt.Sprintf("รายการ %s ถูกดำเนินการไปแล้ว ไม่สามารถ%sซ้ำได้", tradeNo, telegramTopupActionLabel(action))
+	default:
+		return fmt.Sprintf("ไม่สามารถ%sรายการ %s ได้: %s", telegramTopupActionLabel(action), tradeNo, err.Error())
 	}
 }
 
@@ -682,13 +763,37 @@ func OtherPaymentTelegramWebhook(c *gin.Context) {
 		c.Status(http.StatusUnauthorized)
 		return
 	}
-	if !isTelegramGroupAdmin(botToken, update.Message.Chat.ID, update.Message.From.ID) {
-		c.Status(http.StatusForbidden)
+
+	action, tradeNo, recognized := parseTelegramTopupCommand(update.Message.Text)
+	if !recognized {
+		common.ApiSuccess(c, nil)
 		return
 	}
 
-	tradeNo := parseOtherPaymentConfirmText(update.Message.Text)
-	if tradeNo == "" && strings.TrimSpace(update.Message.Text) == "1" && update.Message.ReplyToMessage != nil {
+	isAdmin, err := isTelegramGroupAdmin(botToken, update.Message.Chat.ID, update.Message.From.ID)
+	if err != nil {
+		common.SysLog(fmt.Sprintf("Telegram topup admin verification failed for update %d: %s", update.UpdateID, err.Error()))
+		go sendTelegramCommandMessage(
+			botToken,
+			update.Message.Chat.ID,
+			update.Message.MessageID,
+			"ตรวจสอบสิทธิ์แอดมินไม่สำเร็จ กรุณาลองอีกครั้ง",
+		)
+		common.ApiSuccess(c, nil)
+		return
+	}
+	if !isAdmin {
+		go sendTelegramCommandMessage(
+			botToken,
+			update.Message.Chat.ID,
+			update.Message.MessageID,
+			"คำสั่งอนุมัติหรือปฏิเสธใช้ได้เฉพาะแอดมินของกลุ่ม",
+		)
+		common.ApiSuccess(c, nil)
+		return
+	}
+
+	if tradeNo == "" && update.Message.ReplyToMessage != nil {
 		if value, ok := otherPaymentApprovalMessages.Load(otherPaymentApprovalKey(update.Message.Chat.ID, update.Message.ReplyToMessage.MessageID)); ok {
 			tradeNo, _ = value.(string)
 		}
@@ -697,18 +802,50 @@ func OtherPaymentTelegramWebhook(c *gin.Context) {
 		}
 	}
 
-	if tradeNo != "" {
-		if err := confirmOtherPaymentTrade(tradeNo, c.ClientIP()); err != nil {
-			common.ApiError(c, err)
-			return
-		}
-		go sendTelegramApprovalResult(
+	if tradeNo == "" {
+		go sendTelegramCommandMessage(
 			botToken,
 			update.Message.Chat.ID,
 			update.Message.MessageID,
-			tradeNo,
+			"ไม่พบเลขที่รายการ กรุณา reply ที่รูปสลิปด้วย 1 เพื่ออนุมัติ หรือ 2 เพื่อปฏิเสธ\nหรือส่ง 1 เลขที่รายการ / 2 เลขที่รายการ",
 		)
+		common.ApiSuccess(c, nil)
+		return
 	}
+
+	switch action {
+	case telegramTopupApprove:
+		err = confirmOtherPaymentTrade(tradeNo, c.ClientIP())
+	case telegramTopupReject:
+		LockOrder(tradeNo)
+		err = model.RejectManualTopUp(tradeNo)
+		UnlockOrder(tradeNo)
+	}
+	if err != nil {
+		go sendTelegramCommandMessage(
+			botToken,
+			update.Message.Chat.ID,
+			update.Message.MessageID,
+			telegramTopupErrorMessage(action, tradeNo, err),
+		)
+		common.ApiSuccess(c, nil)
+		return
+	}
+
+	if update.Message.ReplyToMessage != nil {
+		otherPaymentApprovalMessages.Delete(otherPaymentApprovalKey(update.Message.Chat.ID, update.Message.ReplyToMessage.MessageID))
+	}
+
+	resultText := fmt.Sprintf("ปฏิเสธรายการ %s แล้ว ไม่มีการเติมเครดิต", tradeNo)
+	if action == telegramTopupApprove {
+		resultText = fmt.Sprintf("อนุมัติรายการ %s สำเร็จ และเติมเครดิตให้ผู้ใช้แล้ว", tradeNo)
+	}
+	go sendTelegramCommandMessage(
+		botToken,
+		update.Message.Chat.ID,
+		update.Message.MessageID,
+		resultText,
+	)
 	common.ApiSuccess(c, nil)
 }
 

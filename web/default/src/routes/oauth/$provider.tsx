@@ -30,6 +30,7 @@ import { useAuthStore, type AuthUser } from '@/stores/auth-store'
 import { api, getSelf } from '@/lib/api'
 import { OAuthCallbackScreen } from '@/features/auth/components/oauth-callback-screen'
 import { OAUTH_BIND_STORAGE_KEY } from '@/features/auth/constants'
+import { getPostLoginRedirect } from '@/features/auth/lib/redirect'
 
 type OAuthRequestConfig = AxiosRequestConfig & {
   skipBusinessError?: boolean
@@ -116,7 +117,7 @@ function OAuthCallback() {
         }, 200)
       }
 
-      const finalizeLogin = async (): Promise<boolean> => {
+      const finalizeLogin = async (): Promise<AuthUser | null> => {
         try {
           const selfResponse = (await getSelf()) as {
             success?: boolean
@@ -134,16 +135,19 @@ function OAuthCallback() {
             } catch (_error) {
               void _error
             }
-            return true
+            return selfResponse.data
           }
         } catch (_error) {
           void _error
         }
-        return false
+        return null
       }
 
-      const redirectAfterLogin = (target?: string) => {
-        const to = target || search?.redirect || '/dashboard'
+      const redirectAfterLogin = (target?: string, user?: AuthUser | null) => {
+        const to = getPostLoginRedirect(
+          target || search?.redirect,
+          user ?? undefined
+        )
         safeNavigate(to)
         toast.success(i18next.t('Signed in successfully!'))
       }
@@ -154,8 +158,9 @@ function OAuthCallback() {
       }
 
       const handleLoginFailure = async (message: string) => {
-        if (await finalizeLogin()) {
-          redirectAfterLogin()
+        const user = await finalizeLogin()
+        if (user) {
+          redirectAfterLogin(undefined, user)
           return
         }
         toast.error(message)
@@ -193,11 +198,12 @@ function OAuthCallback() {
             } catch (_error) {
               void _error
             }
-            redirectAfterLogin()
+            redirectAfterLogin(undefined, loginUser)
             return
           }
-          if (await finalizeLogin()) {
-            redirectAfterLogin()
+          const finalizedUser = await finalizeLogin()
+          if (finalizedUser) {
+            redirectAfterLogin(undefined, finalizedUser)
             return
           }
           toast.error(res?.data?.message || i18next.t('OAuth failed'))
@@ -208,8 +214,9 @@ function OAuthCallback() {
         if (!res?.data?.success && !isBindingFlow) {
           // When logging in with an already bound GitHub account, backend may return this message
           if (message === '该 GitHub 账户已被绑定') {
-            if (await finalizeLogin()) {
-              redirectAfterLogin()
+            const user = await finalizeLogin()
+            if (user) {
+              redirectAfterLogin(undefined, user)
               return
             }
           }

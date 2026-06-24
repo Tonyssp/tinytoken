@@ -46,9 +46,10 @@ const (
 )
 
 var (
-	ErrPaymentMethodMismatch = errors.New("payment method mismatch")
-	ErrTopUpNotFound         = errors.New("topup not found")
-	ErrTopUpStatusInvalid    = errors.New("topup status invalid")
+	ErrPaymentMethodMismatch      = errors.New("payment method mismatch")
+	ErrTopUpNotFound              = errors.New("topup not found")
+	ErrTopUpStatusInvalid         = errors.New("topup status invalid")
+	ErrManualTopUpProviderInvalid = errors.New("topup is not a manual payment")
 )
 
 func (topUp *TopUp) Insert() error {
@@ -106,6 +107,44 @@ func UpdatePendingTopUpStatus(tradeNo string, expectedPaymentProvider string, ta
 		}
 
 		topUp.Status = targetStatus
+		return tx.Save(topUp).Error
+	})
+}
+
+// RejectManualTopUp marks a pending manual transfer as failed without adding quota.
+func RejectManualTopUp(tradeNo string) error {
+	if tradeNo == "" {
+		return ErrTopUpNotFound
+	}
+
+	refCol := "`trade_no`"
+	if common.UsingPostgreSQL {
+		refCol = `"trade_no"`
+	}
+
+	return DB.Transaction(func(tx *gorm.DB) error {
+		topUp := &TopUp{}
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where(refCol+" = ?", tradeNo).First(topUp).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrTopUpNotFound
+			}
+			return err
+		}
+
+		if topUp.PaymentProvider != PaymentProviderPromptPay &&
+			topUp.PaymentProvider != PaymentProviderOtherManual {
+			return ErrManualTopUpProviderInvalid
+		}
+
+		if topUp.Status == common.TopUpStatusFailed {
+			return nil
+		}
+		if topUp.Status != common.TopUpStatusPending {
+			return ErrTopUpStatusInvalid
+		}
+
+		topUp.Status = common.TopUpStatusFailed
+		topUp.CompleteTime = common.GetTimestamp()
 		return tx.Save(topUp).Error
 	})
 }

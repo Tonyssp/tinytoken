@@ -20,6 +20,7 @@ import { useNavigate } from '@tanstack/react-router'
 import i18n from 'i18next'
 import { useAuthStore } from '@/stores/auth-store'
 import { getSelf } from '@/lib/api'
+import { getPostLoginRedirect } from '@/features/auth/lib/redirect'
 import type { User } from '@/features/users/types'
 import { saveUserId } from '../lib/storage'
 
@@ -57,6 +58,8 @@ export function useAuthRedirect() {
     userData?: { id?: number } | null,
     redirectTo?: string
   ) => {
+    let loggedInUser: User | undefined
+
     // Save user ID if available
     if (userData?.id) {
       saveUserId(userData.id)
@@ -67,6 +70,7 @@ export function useAuthRedirect() {
       const self = await getSelf()
       if (self?.success && self.data) {
         const user = self.data as User
+        loggedInUser = user
         auth.setUser(user)
 
         // Update user ID if not already set
@@ -85,8 +89,11 @@ export function useAuthRedirect() {
       console.error('Failed to fetch user data:', error)
     }
 
-    // Navigate to target page
-    const targetPath = redirectTo || '/dashboard'
+    // Navigate to a page the logged-in user can actually open.
+    const targetPath = getPostLoginRedirect(
+      redirectTo,
+      loggedInUser ?? auth.user ?? undefined
+    )
     navigate({ to: targetPath, replace: true })
   }
 
