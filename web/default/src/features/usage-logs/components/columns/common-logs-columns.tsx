@@ -40,6 +40,7 @@ import { LOG_TYPE_ALL_VALUE } from '../../constants'
 import type { UsageLog } from '../../data/schema'
 import {
   formatModelName,
+  formatSystemLogContent,
   getFirstResponseTimeColor,
   getResponseTimeColor,
   getTieredBillingSummary,
@@ -787,7 +788,7 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
                 </span>
               ) : log.content ? (
                 <span className='text-muted-foreground truncate group-hover:underline'>
-                  {log.content}
+                  {formatSystemLogContent(log.content)}
                 </span>
               ) : (
                 <span className='text-muted-foreground/40'>—</span>

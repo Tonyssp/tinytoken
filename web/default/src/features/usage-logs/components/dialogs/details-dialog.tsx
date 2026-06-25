@@ -45,6 +45,7 @@ import { DynamicPricingBreakdown } from '@/features/pricing/components/dynamic-p
 import type { UsageLog } from '../../data/schema'
 import {
   parseLogOther,
+  formatSystemLogContent,
   getParamOverrideActionLabel,
   parseAuditLine,
   decodeBillingExprB64,
@@ -408,7 +409,7 @@ interface DetailsDialogProps {
 export function DetailsDialog(props: DetailsDialogProps) {
   const { t } = useTranslation()
   const { copiedText, copyToClipboard } = useCopyToClipboard({ notify: false })
-  const details = props.log.content ?? ''
+  const details = formatSystemLogContent(props.log.content ?? '')
   const other = parseLogOther(props.log.other)
   const typeConfig = getLogTypeConfig(props.log.type)
 
@@ -487,7 +488,9 @@ export function DetailsDialog(props: DetailsDialogProps) {
   // Channel update records which fields changed (stable field tokens); render
   // them with their localized labels for admins.
   const changedFieldTokens =
-    isManage && props.isAdmin && Array.isArray(other?.op?.params?.changed_fields)
+    isManage &&
+    props.isAdmin &&
+    Array.isArray(other?.op?.params?.changed_fields)
       ? (other.op.params.changed_fields as string[])
       : []
   const changedFieldsText = changedFieldTokens

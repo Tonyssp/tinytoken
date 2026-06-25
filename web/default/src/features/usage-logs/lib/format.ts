@@ -28,6 +28,13 @@ import type { LogOtherData } from '../types'
 
 export { normalizeTierLabel }
 
+const NEW_USER_CREDIT_LOG_PREFIX = '新用户注册赠送'
+
+export function formatSystemLogContent(content: string): string {
+  if (!content.startsWith(NEW_USER_CREDIT_LOG_PREFIX)) return content
+  return `เครดิตผู้ใช้ใหม่${content.slice(NEW_USER_CREDIT_LOG_PREFIX.length)}`
+}
+
 const PARAM_OVERRIDE_ACTION_MAP: Record<string, string> = {
   set: 'Set',
   delete: 'Delete',
