@@ -20,6 +20,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { getUserModels } from '@/lib/api'
 import {
   resolveTinyTokenApiBaseUrl,
   resolveTinyTokenAppBaseUrl,
@@ -109,7 +110,7 @@ function getModelsEndpoint(): string {
     return `${currentUrl.toString().replace(/\/$/, '')}/v1/chat/completions`
   }
 
-  return `${resolveTinyTokenApiBaseUrl(getStatusServerAddress())}/v1/chat/completions`
+  return `${window.location.origin}/v1/chat/completions`
 }
 
 interface Props {
@@ -124,20 +125,33 @@ export function CCSwitchDialog(props: Props) {
   const [name, setName] = useState<string>(APP_CONFIGS.claude.defaultName)
   const [models, setModels] = useState<Record<string, string>>({})
 
-  const { data: modelsData } = useQuery({
-    queryKey: ['token-models-ccswitch', props.tokenKey],
-    queryFn: () => fetchApiKeyTestModels(props.tokenKey, getModelsEndpoint()),
+  const modelsEndpoint = getModelsEndpoint()
+  const { data: tokenModelsData, isFetching: tokenModelsFetching } = useQuery({
+    queryKey: ['token-models-ccswitch', props.tokenKey, modelsEndpoint],
+    queryFn: () => fetchApiKeyTestModels(props.tokenKey, modelsEndpoint),
     enabled: props.open && Boolean(props.tokenKey),
+    staleTime: 5 * 60 * 1000,
+  })
+  const { data: userModelsData, isFetching: userModelsFetching } = useQuery({
+    queryKey: ['user-models-ccswitch'],
+    queryFn: getUserModels,
+    enabled:
+      props.open &&
+      (!tokenModelsData?.success || tokenModelsData.models.length === 0),
     staleTime: 5 * 60 * 1000,
   })
 
   const modelOptions = useMemo(() => {
-    const items = modelsData?.models ?? []
+    const tokenModels = tokenModelsData?.models ?? []
+    const items =
+      tokenModels.length > 0 ? tokenModels : (userModelsData?.data ?? [])
     const matchingItems = items.filter((model) =>
       APP_MODEL_PATTERNS[app].test(model)
     )
     return matchingItems.map((model) => ({ value: model, label: model }))
-  }, [app, modelsData?.models])
+  }, [app, tokenModelsData?.models, userModelsData?.data])
+
+  const modelsPending = tokenModelsFetching || userModelsFetching
 
   useEffect(() => {
     if (props.open) {
@@ -239,8 +253,13 @@ export function CCSwitchDialog(props: Props) {
               onValueChange={(v) =>
                 setModels((prev) => ({ ...prev, [field.key]: v }))
               }
-              placeholder={t('Select or enter model name')}
-              emptyText={t('No models found')}
+              placeholder={
+                modelsPending
+                  ? t('Loading models...')
+                  : t('Select or enter model name')
+              }
+              emptyText={t('No models found. Enter the model name manually.')}
+              allowCustomValue
             />
           </div>
         ))}
