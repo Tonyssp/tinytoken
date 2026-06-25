@@ -168,8 +168,16 @@ function OAuthCallback() {
       }
 
       try {
+        const redirectUri =
+          typeof window !== 'undefined'
+            ? `${window.location.origin}/oauth/${provider}`
+            : undefined
         const config: OAuthRequestConfig = {
-          params: { code: search.code, state: search.state },
+          params: {
+            code: search.code,
+            state: search.state,
+            redirect_uri: redirectUri,
+          },
           skipBusinessError: true,
         }
         const res = await api.get(`/api/oauth/${provider}`, config)

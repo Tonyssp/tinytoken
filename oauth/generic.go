@@ -87,6 +87,39 @@ func (p *GenericOAuthProvider) GetConfig() *model.CustomOAuthProvider {
 	return p.config
 }
 
+func resolveGenericOAuthRedirectURI(c *gin.Context, slug string, fallback string) string {
+	requestedRedirectURI := strings.TrimSpace(c.Query("redirect_uri"))
+	if requestedRedirectURI == "" {
+		return fallback
+	}
+
+	parsedRedirectURI, err := url.Parse(requestedRedirectURI)
+	if err != nil ||
+		(parsedRedirectURI.Scheme != "https" && parsedRedirectURI.Scheme != "http") ||
+		parsedRedirectURI.Host == "" ||
+		parsedRedirectURI.RawQuery != "" ||
+		parsedRedirectURI.Fragment != "" ||
+		parsedRedirectURI.Path != "/oauth/"+slug {
+		return fallback
+	}
+
+	redirectOrigin := parsedRedirectURI.Scheme + "://" + parsedRedirectURI.Host
+	requestOrigin := strings.TrimRight(strings.TrimSpace(c.GetHeader("Origin")), "/")
+	if requestOrigin == "" {
+		refererValue := strings.TrimSpace(c.GetHeader("Referer"))
+		if referer, refererErr := url.Parse(refererValue); refererErr == nil && referer.Scheme != "" && referer.Host != "" {
+			requestOrigin = referer.Scheme + "://" + referer.Host
+		}
+	}
+	if requestOrigin == "" && strings.EqualFold(c.Request.Host, parsedRedirectURI.Host) {
+		requestOrigin = redirectOrigin
+	}
+	if requestOrigin != redirectOrigin {
+		return fallback
+	}
+	return requestedRedirectURI
+}
+
 func (p *GenericOAuthProvider) ExchangeToken(ctx context.Context, code string, c *gin.Context) (*OAuthToken, error) {
 	if code == "" {
 		return nil, NewOAuthError(i18n.MsgOAuthInvalidCode, nil)
@@ -95,6 +128,7 @@ func (p *GenericOAuthProvider) ExchangeToken(ctx context.Context, code string, c
 	logger.LogDebug(ctx, "[OAuth-Generic-%s] ExchangeToken: code=%s...", p.config.Slug, code[:min(len(code), 10)])
 
 	redirectUri := fmt.Sprintf("%s/oauth/%s", system_setting.ServerAddress, p.config.Slug)
+	redirectUri = resolveGenericOAuthRedirectURI(c, p.config.Slug, redirectUri)
 	values := url.Values{}
 	values.Set("grant_type", "authorization_code")
 	values.Set("code", code)
