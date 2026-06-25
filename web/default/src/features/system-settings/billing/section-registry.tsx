@@ -62,28 +62,33 @@ const BILLING_SECTIONS = [
   {
     id: 'quota',
     titleKey: 'Quota Settings',
-    build: (settings: BillingSettings) => (
-      <QuotaSettingsSection
-        defaultValues={{
-          QuotaForNewUser: settings.QuotaForNewUser,
-          PreConsumedQuota: settings.PreConsumedQuota,
-          QuotaForInviter: settings.QuotaForInviter,
-          QuotaForInvitee: settings.QuotaForInvitee,
-          TopUpLink: settings.TopUpLink,
-          general_setting: {
-            docs_link: settings['general_setting.docs_link'],
-          },
-          quota_setting: {
-            enable_free_model_pre_consume:
-              settings['quota_setting.enable_free_model_pre_consume'],
-          },
-        }}
-        complianceConfirmed={
-          (settings['payment_setting.compliance_confirmed'] ?? false) &&
-          settings['payment_setting.compliance_terms_version'] === 'v1'
-        }
-      />
-    ),
+    build: (settings: BillingSettings) => {
+      const quotaPerUnit =
+        settings.QuotaPerUnit > 0 ? settings.QuotaPerUnit : 500000
+      return (
+        <QuotaSettingsSection
+          defaultValues={{
+            QuotaForNewUser: settings.QuotaForNewUser / quotaPerUnit,
+            PreConsumedQuota: settings.PreConsumedQuota / quotaPerUnit,
+            QuotaForInviter: settings.QuotaForInviter / quotaPerUnit,
+            QuotaForInvitee: settings.QuotaForInvitee / quotaPerUnit,
+            TopUpLink: settings.TopUpLink,
+            general_setting: {
+              docs_link: settings['general_setting.docs_link'],
+            },
+            quota_setting: {
+              enable_free_model_pre_consume:
+                settings['quota_setting.enable_free_model_pre_consume'],
+            },
+          }}
+          quotaPerUnit={quotaPerUnit}
+          complianceConfirmed={
+            (settings['payment_setting.compliance_confirmed'] ?? false) &&
+            settings['payment_setting.compliance_terms_version'] === 'v1'
+          }
+        />
+      )
+    },
   },
   {
     id: 'currency',

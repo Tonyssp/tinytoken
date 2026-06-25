@@ -65,11 +65,13 @@ type QuotaFormValues = z.infer<typeof quotaSchema>
 
 type QuotaSettingsSectionProps = {
   defaultValues: QuotaFormValues
+  quotaPerUnit: number
   complianceConfirmed?: boolean
 }
 
 export function QuotaSettingsSection({
   defaultValues,
+  quotaPerUnit,
   complianceConfirmed = true,
 }: QuotaSettingsSectionProps) {
   const { t } = useTranslation()
@@ -92,9 +94,20 @@ export function QuotaSettingsSection({
       defaultValues,
       onSubmit: async (_data, changedFields) => {
         for (const [key, value] of Object.entries(changedFields)) {
+          const isQuotaCreditField = [
+            'QuotaForNewUser',
+            'PreConsumedQuota',
+            'QuotaForInviter',
+            'QuotaForInvitee',
+          ].includes(key)
+          const serializedValue =
+            isQuotaCreditField && typeof value === 'number'
+              ? Math.round(value * quotaPerUnit)
+              : value
+
           await updateOption.mutateAsync({
             key,
-            value: value as string | number | boolean,
+            value: serializedValue as string | number | boolean,
           })
         }
       },
@@ -139,7 +152,7 @@ export function QuotaSettingsSection({
                     />
                   </FormControl>
                   <FormDescription>
-                    {t('Initial quota given to new users')}
+                    {t('Initial quota given to new users')} ($Credit)
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

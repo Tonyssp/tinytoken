@@ -45,9 +45,15 @@ export function buildChatCompletionPayload(
   }
 
   // Add enabled parameters
+  // Some upstream models reject requests containing both sampling controls.
+  // Prefer temperature when both legacy toggles are enabled.
+  const samplingKey =
+    parameterEnabled.temperature || !parameterEnabled.top_p
+      ? 'temperature'
+      : 'top_p'
+
   const parameterKeys: Array<keyof ParameterEnabled> = [
-    'temperature',
-    'top_p',
+    samplingKey,
     'max_tokens',
     'frequency_penalty',
     'presence_penalty',

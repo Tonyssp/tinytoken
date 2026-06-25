@@ -487,6 +487,13 @@ export function DataTableRowActions<TData>({
       const realKey = await resolveRealKey(apiKey.id)
       if (!realKey) return
 
+      if (preset.url.trim().toLowerCase() === 'ccswitch') {
+        setResolvedKey(realKey)
+        setCurrentRow(apiKey)
+        setOpen('cc-switch')
+        return
+      }
+
       if (preset.type === 'fluent') {
         const success = sendToFluent(realKey, serverAddress)
         if (success) {
@@ -520,7 +527,15 @@ export function DataTableRowActions<TData>({
         window.location.href = resolvedUrl
       }
     },
-    [resolveRealKey, apiKey.id, serverAddress, t]
+    [
+      resolveRealKey,
+      apiKey,
+      serverAddress,
+      setCurrentRow,
+      setOpen,
+      setResolvedKey,
+      t,
+    ]
   )
 
   const handleToggleStatus = async (

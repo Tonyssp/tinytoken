@@ -20,7 +20,6 @@ import { useState, useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { getUserModels } from '@/lib/api'
 import {
   resolveTinyTokenApiBaseUrl,
   resolveTinyTokenAppBaseUrl,
@@ -30,6 +29,7 @@ import { ComboboxInput } from '@/components/ui/combobox-input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Dialog } from '@/components/dialog'
+import { fetchApiKeyTestModels } from '../../api'
 
 const APP_CONFIGS = {
   claude: {
@@ -55,6 +55,12 @@ const APP_CONFIGS = {
 } as const
 
 type AppType = keyof typeof APP_CONFIGS
+
+const APP_MODEL_PATTERNS: Record<AppType, RegExp> = {
+  claude: /claude/i,
+  codex: /(?:codex|gpt|^o\d|openai)/i,
+  gemini: /gemini/i,
+}
 
 function getStatusServerAddress(): string {
   try {
@@ -93,6 +99,19 @@ function buildCCSwitchURL(
   return `ccswitch://v1/import?${params.toString()}`
 }
 
+function getModelsEndpoint(): string {
+  const currentUrl = new URL(window.location.origin)
+  if (
+    currentUrl.hostname === '127.0.0.1' ||
+    currentUrl.hostname === 'localhost'
+  ) {
+    currentUrl.port = '3000'
+    return `${currentUrl.toString().replace(/\/$/, '')}/v1/chat/completions`
+  }
+
+  return `${resolveTinyTokenApiBaseUrl(getStatusServerAddress())}/v1/chat/completions`
+}
+
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -106,16 +125,19 @@ export function CCSwitchDialog(props: Props) {
   const [models, setModels] = useState<Record<string, string>>({})
 
   const { data: modelsData } = useQuery({
-    queryKey: ['user-models-ccswitch'],
-    queryFn: getUserModels,
-    enabled: props.open,
+    queryKey: ['token-models-ccswitch', props.tokenKey],
+    queryFn: () => fetchApiKeyTestModels(props.tokenKey, getModelsEndpoint()),
+    enabled: props.open && Boolean(props.tokenKey),
     staleTime: 5 * 60 * 1000,
   })
 
   const modelOptions = useMemo(() => {
-    const items = modelsData?.data ?? []
-    return items.map((m) => ({ value: m, label: m }))
-  }, [modelsData?.data])
+    const items = modelsData?.models ?? []
+    const matchingItems = items.filter((model) =>
+      APP_MODEL_PATTERNS[app].test(model)
+    )
+    return matchingItems.map((model) => ({ value: model, label: model }))
+  }, [app, modelsData?.models])
 
   useEffect(() => {
     if (props.open) {
