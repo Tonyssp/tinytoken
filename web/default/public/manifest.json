@@ -1,0 +1,23 @@
+{
+  "name": "TinyToken",
+  "short_name": "TinyToken",
+  "description": "TinyToken รวม Claude, GPT, Gemini, Codex และโมเดล AI ยอดนิยมไว้ใน API เดียว พร้อมเติมเครดิตและสร้าง API Key ได้ง่าย",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#5B4DFF",
+  "background_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/tinytoken-og.png",
+      "sizes": "1200x630",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
