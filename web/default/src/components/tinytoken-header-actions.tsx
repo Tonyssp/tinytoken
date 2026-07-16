@@ -23,7 +23,6 @@ import {
   KeyRound,
   LayoutDashboard,
   MessageSquare,
-  Trophy,
   WalletCards,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -49,11 +48,6 @@ const headerActionLinks = [
     title: 'เติมเงิน',
     href: '/wallet',
     icon: WalletCards,
-  },
-  {
-    title: 'อันดับ',
-    href: '/rankings/?view=users&period=month',
-    icon: Trophy,
   },
   {
     title: 'Getting Started',
@@ -98,10 +92,9 @@ export function TinyTokenHeaderActions() {
       {headerActionLinks.map((link) => {
         const Icon = link.icon
         const normalizedHref = normalize(link.href)
-        const active =
-          link.external
-            ? false
-            : normalizedHref === '/'
+        const active = link.external
+          ? false
+          : normalizedHref === '/'
             ? currentPath === '/'
             : currentPath === normalizedHref ||
               currentPath.startsWith(`${normalizedHref}/`)
@@ -128,11 +121,7 @@ export function TinyTokenHeaderActions() {
         }
 
         return (
-          <Link
-            key={link.title}
-            to={link.href}
-            className={className}
-          >
+          <Link key={link.title} to={link.href} className={className}>
             <Icon className='size-[18px]' />
             <span>{link.title}</span>
           </Link>

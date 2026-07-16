@@ -880,7 +880,7 @@ export function PaymentSettingsSection({
     const values = form.getValues()
     const sanitized = {
       OtherPaymentEnabled: values.OtherPaymentEnabled as boolean,
-      OtherPaymentCurrency: 'LAK',
+      OtherPaymentCurrency: values.OtherPaymentCurrency.trim() || 'LAK',
       OtherPaymentRate: values.OtherPaymentRate as number,
       OtherPaymentMinTopUp: values.OtherPaymentMinTopUp as number,
       OtherPaymentAmountOptions: values.OtherPaymentAmountOptions.trim(),
@@ -898,7 +898,8 @@ export function PaymentSettingsSection({
 
     const initial = {
       OtherPaymentEnabled: initialRef.current.OtherPaymentEnabled,
-      OtherPaymentCurrency: 'LAK',
+      OtherPaymentCurrency:
+        initialRef.current.OtherPaymentCurrency.trim() || 'LAK',
       OtherPaymentRate: initialRef.current.OtherPaymentRate,
       OtherPaymentMinTopUp: initialRef.current.OtherPaymentMinTopUp,
       OtherPaymentAmountOptions:
@@ -2106,7 +2107,7 @@ export function PaymentSettingsSection({
                 </h3>
                 <p className='text-muted-foreground text-sm'>
                   {t(
-                    'Separate Laos manual payment flow. Currency is fixed to LAK; members upload slips and admins approve manually or through bot confirmation.'
+                    'Separate manual payment channels. Add banks, QR codes, account details, and notes; each enabled method becomes a tab on the member wallet page.'
                   )}
                 </p>
               </div>
@@ -2118,7 +2119,7 @@ export function PaymentSettingsSection({
                     <SettingsSwitchContent>
                       <FormLabel>{t('Enable Other Payment')}</FormLabel>
                       <FormDescription>
-                        {t('Show Laos payment to members')}
+                        {t('Show manual payment channels to members')}
                       </FormDescription>
                     </SettingsSwitchContent>
                     <FormControl>
@@ -2150,10 +2151,17 @@ export function PaymentSettingsSection({
                   <FormItem>
                     <FormLabel>{t('Currency')}</FormLabel>
                     <FormControl>
-                      <Input {...field} value='LAK' disabled />
+                      <Input
+                        {...field}
+                        value={field.value || 'LAK'}
+                        placeholder='LAK, THB, USD, USDT'
+                        onChange={(event) =>
+                          field.onChange(event.target.value.toUpperCase())
+                        }
+                      />
                     </FormControl>
                     <FormDescription>
-                      {t('Other Payment is Laos only')}
+                      {t('Currency label shown on member wallet tabs')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -2165,7 +2173,7 @@ export function PaymentSettingsSection({
                 name='OtherPaymentRate'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('Credit rate per LAK')}</FormLabel>
+                    <FormLabel>{t('Credit rate per currency unit')}</FormLabel>
                     <FormControl>
                       <Input
                         type='number'
@@ -2178,7 +2186,7 @@ export function PaymentSettingsSection({
                       />
                     </FormControl>
                     <FormDescription>
-                      {t('Example: 1 LAK = 1 credit')}
+                      {t('Example: 1 unit = 1 credit')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -2190,7 +2198,7 @@ export function PaymentSettingsSection({
                 name='OtherPaymentMinTopUp'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('Minimum transfer amount (LAK)')}</FormLabel>
+                    <FormLabel>{t('Minimum transfer amount')}</FormLabel>
                     <FormControl>
                       <Input
                         type='number'
@@ -2203,7 +2211,7 @@ export function PaymentSettingsSection({
                       />
                     </FormControl>
                     <FormDescription>
-                      {t('Smallest Laos transfer members can submit')}
+                      {t('Smallest manual transfer members can submit')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -2215,7 +2223,7 @@ export function PaymentSettingsSection({
                 name='OtherPaymentAmountOptions'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('Suggested LAK amounts')}</FormLabel>
+                    <FormLabel>{t('Suggested amounts')}</FormLabel>
                     <FormControl>
                       <Textarea
                         rows={3}
@@ -2225,7 +2233,7 @@ export function PaymentSettingsSection({
                       />
                     </FormControl>
                     <FormDescription>
-                      {t('Preset LAK buttons shown to members')}
+                      {t('Preset amount buttons shown to members')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -2249,7 +2257,7 @@ export function PaymentSettingsSection({
               </div>
               <div className='grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end'>
                 <FormItem>
-                  <FormLabel>{t('Member pays (LAK)')}</FormLabel>
+                  <FormLabel>{t('Member pays')}</FormLabel>
                   <FormControl>
                     <Input
                       type='number'
@@ -2330,7 +2338,7 @@ export function PaymentSettingsSection({
                           {t('Telegram approval bot')}
                         </FormLabel>
                         <FormDescription>
-                          {t('Send Laos slips to Telegram group')}
+                          {t('Send manual payment slips to Telegram group')}
                         </FormDescription>
                       </div>
                       <FormControl>
@@ -2392,7 +2400,7 @@ export function PaymentSettingsSection({
                           {t('LINE approval bot')}
                         </FormLabel>
                         <FormDescription>
-                          {t('Send Laos payment notices to LINE group')}
+                          {t('Send manual payment notices to LINE group')}
                         </FormDescription>
                       </div>
                       <FormControl>

@@ -108,6 +108,7 @@ func GetStatus(c *gin.Context) {
 		"SidebarModulesAdmin": common.OptionMap["SidebarModulesAdmin"],
 
 		// Public rankings controls. Missing legacy values default to enabled.
+		"user_leaderboard_enabled":     common.OptionMap["UserLeaderboardEnabled"] == "true",
 		"rankings_year_period_enabled": common.OptionMap["RankingsYearPeriodEnabled"] != "false",
 		"rankings_all_period_enabled":  common.OptionMap["RankingsAllPeriodEnabled"] != "false",
 

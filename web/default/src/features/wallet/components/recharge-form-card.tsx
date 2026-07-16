@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   Banknote,
   CheckCircle2,
@@ -85,6 +85,12 @@ const BANK_OPTION_GROUPS = [
 ]
 
 const DEFAULT_PROMPTPAY_ID = '0844155451'
+
+const OTHER_PANEL_PREFIX = 'other:'
+
+function getOtherPanelKey(methodId: string) {
+  return `${OTHER_PANEL_PREFIX}${methodId}`
+}
 
 function formatPromptPayField(id: string, value: string) {
   return `${id}${value.length.toString().padStart(2, '0')}${value}`
@@ -216,9 +222,7 @@ export function RechargeFormCard({
 }: RechargeFormCardProps) {
   const { t } = useTranslation()
   const [localAmount, setLocalAmount] = useState('')
-  const [activeTopupPanel, setActiveTopupPanel] = useState<'thai' | 'other'>(
-    'thai'
-  )
+  const [activeTopupPanel, setActiveTopupPanel] = useState('thai')
   const [selectedPromptPayBank, setSelectedPromptPayBank] = useState('')
   const [promptPaySlipName, setPromptPaySlipName] = useState('')
   const [promptPaySlipFile, setPromptPaySlipFile] = useState<File | null>(null)
@@ -234,7 +238,9 @@ export function RechargeFormCard({
   const [submittingOtherPayment, setSubmittingOtherPayment] = useState(false)
 
   useEffect(() => {
+    // Keep the typed amount synced when preset buttons update topupAmount.
     if (topupInfo?.enable_promptpay_topup && topupAmount === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLocalAmount('')
       return
     }
@@ -250,16 +256,24 @@ export function RechargeFormCard({
     }
   }
 
+  const promptPayEnabled = !!topupInfo?.enable_promptpay_topup
+  const otherPaymentMethods = useMemo(
+    () =>
+      (topupInfo?.other_payment_methods || []).filter(
+        (method) => method.enabled !== false
+      ),
+    [topupInfo?.other_payment_methods]
+  )
+  const otherPaymentEnabled =
+    !!topupInfo?.enable_other_payment_topup && otherPaymentMethods.length > 0
   const hasConfigurableTopup =
     topupInfo?.enable_online_topup ||
     topupInfo?.enable_stripe_topup ||
-    topupInfo?.enable_promptpay_topup ||
-    topupInfo?.enable_other_payment_topup ||
+    promptPayEnabled ||
+    otherPaymentEnabled ||
     enableWaffoTopup ||
     enableWaffoPancakeTopup
   const hasAnyTopup = hasConfigurableTopup || enableCreemTopup
-  const promptPayEnabled = !!topupInfo?.enable_promptpay_topup
-  const otherPaymentEnabled = !!topupInfo?.enable_other_payment_topup
   const promptPayId = topupInfo?.promptpay_id?.trim() || DEFAULT_PROMPTPAY_ID
   const promptPayRate = Number(topupInfo?.promptpay_rate || 0)
   const promptPayCredits = topupAmount * promptPayRate
@@ -284,10 +298,18 @@ export function RechargeFormCard({
     !!selectedPromptPayBank &&
     topupAmount >= minTopup &&
     topupAmount > 0
-  const otherPaymentMethods = topupInfo?.other_payment_methods || []
-  const selectedOtherMethod = otherPaymentMethods.find(
-    (method) => method.id === selectedOtherMethodId
-  )
+  const activeOtherMethodId = activeTopupPanel.startsWith(OTHER_PANEL_PREFIX)
+    ? activeTopupPanel.slice(OTHER_PANEL_PREFIX.length)
+    : selectedOtherMethodId
+  const selectedOtherMethod =
+    otherPaymentMethods.find((method) => method.id === activeOtherMethodId) ??
+    otherPaymentMethods[0]
+  const effectiveActiveTopupPanel =
+    activeTopupPanel.startsWith(OTHER_PANEL_PREFIX) || !promptPayEnabled
+      ? selectedOtherMethod
+        ? getOtherPanelKey(selectedOtherMethod.id)
+        : activeTopupPanel
+      : activeTopupPanel
   const otherPaymentCurrency = topupInfo?.other_payment_currency || 'LAK'
   const otherPaymentRate = Number(topupInfo?.other_payment_rate || 0)
   const otherPaymentMinTopup = Number(topupInfo?.other_payment_min_topup || 0)
@@ -302,22 +324,10 @@ export function RechargeFormCard({
     ? topupInfo.other_payment_amount_options
     : [30000, 50000, 100000]
   const canSubmitOtherPayment =
-    !!selectedOtherMethodId &&
+    !!selectedOtherMethod?.id &&
     !!otherSlipFile &&
     otherPaymentAmount > 0 &&
     !otherPaymentAmountTooLow
-
-  useEffect(() => {
-    if (!promptPayEnabled && otherPaymentEnabled) {
-      setActiveTopupPanel('other')
-    }
-  }, [promptPayEnabled, otherPaymentEnabled])
-
-  useEffect(() => {
-    if (!selectedOtherMethodId && otherPaymentMethods.length > 0) {
-      setSelectedOtherMethodId(otherPaymentMethods[0].id)
-    }
-  }, [otherPaymentMethods, selectedOtherMethodId])
 
   const copyPromptPayId = async () => {
     if (!promptPayId) {
@@ -371,13 +381,13 @@ export function RechargeFormCard({
   }
 
   const handleOtherPaymentSubmit = async () => {
-    if (!canSubmitOtherPayment || !otherSlipFile) {
+    if (!canSubmitOtherPayment || !otherSlipFile || !selectedOtherMethod) {
       return
     }
 
     const formData = new FormData()
     formData.append('amount', otherPaymentAmount.toString())
-    formData.append('method_id', selectedOtherMethodId)
+    formData.append('method_id', selectedOtherMethod.id)
     formData.append(
       'bank_from',
       otherBankFrom || selectedOtherMethod?.bank_name || ''
@@ -479,30 +489,44 @@ export function RechargeFormCard({
       {/* Online Topup Section */}
       {hasAnyTopup ? (
         <div className='space-y-4 sm:space-y-6'>
-          {promptPayEnabled && otherPaymentEnabled && (
-            <div className='grid gap-2 sm:grid-cols-2'>
-              <Button
-                type='button'
-                variant={activeTopupPanel === 'thai' ? 'default' : 'outline'}
-                className='h-11 justify-start gap-2'
-                onClick={() => setActiveTopupPanel('thai')}
-              >
-                <Banknote className='h-4 w-4' />
-                {t('Bank transfer / PromptPay')}
-              </Button>
-              <Button
-                type='button'
-                variant={activeTopupPanel === 'other' ? 'default' : 'outline'}
-                className='h-11 justify-start gap-2'
-                onClick={() => setActiveTopupPanel('other')}
-              >
-                <WalletCards className='h-4 w-4' />
-                {t('Other Payment')}
-              </Button>
+          {(promptPayEnabled ? 1 : 0) + otherPaymentMethods.length > 1 && (
+            <div className='grid gap-2 sm:grid-cols-2 xl:grid-cols-3'>
+              {promptPayEnabled && (
+                <Button
+                  type='button'
+                  variant={
+                    effectiveActiveTopupPanel === 'thai' ? 'default' : 'outline'
+                  }
+                  className='h-11 justify-start gap-2'
+                  onClick={() => setActiveTopupPanel('thai')}
+                >
+                  <Banknote className='h-4 w-4' />
+                  {t('Bank transfer / PromptPay')}
+                </Button>
+              )}
+              {otherPaymentMethods.map((method) => (
+                <Button
+                  key={method.id}
+                  type='button'
+                  variant={
+                    effectiveActiveTopupPanel === getOtherPanelKey(method.id)
+                      ? 'default'
+                      : 'outline'
+                  }
+                  className='h-11 justify-start gap-2'
+                  onClick={() => {
+                    setSelectedOtherMethodId(method.id)
+                    setActiveTopupPanel(getOtherPanelKey(method.id))
+                  }}
+                >
+                  <WalletCards className='h-4 w-4' />
+                  <span className='truncate'>{method.name}</span>
+                </Button>
+              ))}
             </div>
           )}
 
-          {promptPayEnabled && activeTopupPanel === 'thai' && (
+          {promptPayEnabled && effectiveActiveTopupPanel === 'thai' && (
             <div className='space-y-4'>
               <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
                 <div className='flex items-center gap-2'>
@@ -702,216 +726,205 @@ export function RechargeFormCard({
             </div>
           )}
 
-          {otherPaymentEnabled && activeTopupPanel === 'other' && (
-            <div className='space-y-4'>
-              <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
-                <div className='flex items-center gap-2'>
-                  <WalletCards className='h-4 w-4' />
-                  <Label className='text-base font-semibold'>
-                    {t('Other Payment')}
-                  </Label>
-                </div>
-                <div className='text-muted-foreground flex items-center gap-2 text-sm'>
-                  <CheckCircle2 className='h-4 w-4 text-green-600' />
-                  {t('Laos manual manager review')}
-                </div>
-              </div>
-
-              <div className='grid grid-cols-2 gap-2 sm:grid-cols-4'>
-                {otherPaymentPresets.map((amount) => (
-                  <Button
-                    key={amount}
-                    type='button'
-                    variant={
-                      selectedOtherPreset === amount ? 'default' : 'outline'
-                    }
-                    onClick={() => handleOtherPresetSelect(amount)}
-                    className='h-10'
-                  >
-                    ₭{formatNumber(amount)}
-                  </Button>
-                ))}
-              </div>
-
-              <div className='grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]'>
-                <div className='space-y-4 rounded-lg border p-4'>
-                  <div className='space-y-2'>
-                    <Label htmlFor='other-payment-amount'>
-                      {t('Transfer amount (LAK)')}
+          {otherPaymentEnabled &&
+            effectiveActiveTopupPanel.startsWith(OTHER_PANEL_PREFIX) &&
+            selectedOtherMethod && (
+              <div className='space-y-4'>
+                <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+                  <div className='flex items-center gap-2'>
+                    <WalletCards className='h-4 w-4' />
+                    <Label className='text-base font-semibold'>
+                      {selectedOtherMethod.name || t('Other Payment')}
                     </Label>
-                    <Input
-                      id='other-payment-amount'
-                      type='number'
-                      value={otherAmount}
-                      onChange={(e) => handleOtherAmountChange(e.target.value)}
-                      min={otherPaymentMinTopup}
-                      placeholder={t('Minimum {{amount}} LAK', {
-                        amount: formatNumber(otherPaymentMinTopup),
-                      })}
-                      className='h-11 text-lg'
-                    />
-                    <p className='text-muted-foreground text-sm'>
-                      {t('Estimated credit: {{amount}}', {
-                        amount: formatNumber(otherPaymentCredits || 0),
-                      })}
-                    </p>
-                    {otherPaymentAmountTooLow && (
-                      <p className='text-sm font-medium text-amber-600'>
-                        {t('Minimum transfer amount is {{amount}} LAK', {
-                          amount: formatNumber(otherPaymentMinTopup),
+                  </div>
+                  <div className='text-muted-foreground flex items-center gap-2 text-sm'>
+                    <CheckCircle2 className='h-4 w-4 text-green-600' />
+                    {t('Manual review')}
+                  </div>
+                </div>
+
+                <div className='grid grid-cols-2 gap-2 sm:grid-cols-4'>
+                  {otherPaymentPresets.map((amount) => (
+                    <Button
+                      key={amount}
+                      type='button'
+                      variant={
+                        selectedOtherPreset === amount ? 'default' : 'outline'
+                      }
+                      onClick={() => handleOtherPresetSelect(amount)}
+                      className='h-10'
+                    >
+                      {otherPaymentCurrency} {formatNumber(amount)}
+                    </Button>
+                  ))}
+                </div>
+
+                <div className='grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]'>
+                  <div className='space-y-4 rounded-lg border p-4'>
+                    <div className='space-y-2'>
+                      <Label htmlFor='other-payment-amount'>
+                        {t('Transfer amount')} ({otherPaymentCurrency})
+                      </Label>
+                      <Input
+                        id='other-payment-amount'
+                        type='number'
+                        value={otherAmount}
+                        onChange={(e) =>
+                          handleOtherAmountChange(e.target.value)
+                        }
+                        min={otherPaymentMinTopup}
+                        placeholder={`${t('Minimum')} ${formatNumber(
+                          otherPaymentMinTopup
+                        )} ${otherPaymentCurrency}`}
+                        className='h-11 text-lg'
+                      />
+                      <p className='text-muted-foreground text-sm'>
+                        {t('Estimated credit: {{amount}}', {
+                          amount: formatNumber(otherPaymentCredits || 0),
                         })}
                       </p>
-                    )}
-                  </div>
-
-                  <div className='space-y-2'>
-                    <Label htmlFor='other-payment-method'>
-                      {t('Laos payment method')}
-                    </Label>
-                    <select
-                      id='other-payment-method'
-                      value={selectedOtherMethodId}
-                      onChange={(e) => setSelectedOtherMethodId(e.target.value)}
-                      className='border-input bg-background ring-offset-background focus-visible:ring-ring h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none'
-                    >
-                      <option value=''>{t('Select bank')}</option>
-                      {otherPaymentMethods.map((method) => (
-                        <option key={method.id} value={method.id}>
-                          {method.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className='grid gap-4 sm:grid-cols-[220px_minmax(0,1fr)]'>
-                    <div className='flex min-h-[220px] items-center justify-center rounded-lg border bg-white p-4'>
-                      {selectedOtherMethod?.qr_image_url ? (
-                        <img
-                          src={selectedOtherMethod.qr_image_url}
-                          alt={t('Payment QR')}
-                          className='h-full max-h-[210px] w-full max-w-[210px] object-contain'
-                        />
-                      ) : (
-                        <div className='text-muted-foreground flex flex-col items-center gap-2 text-center text-sm'>
-                          <QrCode className='h-10 w-10' />
-                          {t('Payment QR is not configured.')}
-                        </div>
+                      {otherPaymentAmountTooLow && (
+                        <p className='text-sm font-medium text-amber-600'>
+                          {t('Minimum transfer amount is {{amount}}', {
+                            amount: `${formatNumber(
+                              otherPaymentMinTopup
+                            )} ${otherPaymentCurrency}`,
+                          })}
+                        </p>
                       )}
                     </div>
 
-                    <div className='bg-muted/30 space-y-3 rounded-lg border p-4'>
-                      <div className='grid grid-cols-[120px_minmax(0,1fr)] gap-2 text-sm'>
-                        <span className='text-muted-foreground'>
-                          {t('Currency')}
-                        </span>
-                        <span className='font-semibold'>
-                          {otherPaymentCurrency}
-                        </span>
-                        <span className='text-muted-foreground'>
-                          {t('Bank')}
-                        </span>
-                        <span className='font-medium'>
-                          {selectedOtherMethod?.bank_name || '-'}
-                        </span>
-                        <span className='text-muted-foreground'>
-                          {t('Account name')}
-                        </span>
-                        <span className='font-medium'>
-                          {selectedOtherMethod?.account_name || '-'}
-                        </span>
-                        <span className='text-muted-foreground'>
-                          {t('Account number')}
-                        </span>
-                        <div className='flex min-w-0 items-center gap-2'>
-                          <span className='truncate font-mono font-semibold'>
-                            {selectedOtherMethod?.account_number || '-'}
-                          </span>
-                          {selectedOtherMethod?.account_number && (
-                            <Button
-                              type='button'
-                              variant='outline'
-                              size='sm'
-                              className='h-7 px-2'
-                              onClick={() => {
-                                navigator.clipboard.writeText(
-                                  selectedOtherMethod.account_number
-                                )
-                                toast.success(t('Copied account number'))
-                              }}
-                            >
-                              <Copy className='h-3.5 w-3.5' />
-                            </Button>
-                          )}
-                        </div>
+                    <div className='grid gap-4 sm:grid-cols-[220px_minmax(0,1fr)]'>
+                      <div className='flex min-h-[220px] items-center justify-center rounded-lg border bg-white p-4'>
+                        {selectedOtherMethod?.qr_image_url ? (
+                          <img
+                            src={selectedOtherMethod.qr_image_url}
+                            alt={t('Payment QR')}
+                            className='h-full max-h-[210px] w-full max-w-[210px] object-contain'
+                          />
+                        ) : (
+                          <div className='text-muted-foreground flex flex-col items-center gap-2 text-center text-sm'>
+                            <QrCode className='h-10 w-10' />
+                            {t('Payment QR is not configured.')}
+                          </div>
+                        )}
                       </div>
-                      {selectedOtherMethod?.note && (
-                        <div className='border-t pt-3 text-sm'>
-                          <p className='text-muted-foreground'>
-                            {selectedOtherMethod.note}
-                          </p>
+
+                      <div className='bg-muted/30 space-y-3 rounded-lg border p-4'>
+                        <div className='grid grid-cols-[120px_minmax(0,1fr)] gap-2 text-sm'>
+                          <span className='text-muted-foreground'>
+                            {t('Currency')}
+                          </span>
+                          <span className='font-semibold'>
+                            {otherPaymentCurrency}
+                          </span>
+                          <span className='text-muted-foreground'>
+                            {t('Bank')}
+                          </span>
+                          <span className='font-medium'>
+                            {selectedOtherMethod?.bank_name || '-'}
+                          </span>
+                          <span className='text-muted-foreground'>
+                            {t('Account name')}
+                          </span>
+                          <span className='font-medium'>
+                            {selectedOtherMethod?.account_name || '-'}
+                          </span>
+                          <span className='text-muted-foreground'>
+                            {t('Account number')}
+                          </span>
+                          <div className='flex min-w-0 items-center gap-2'>
+                            <span className='truncate font-mono font-semibold'>
+                              {selectedOtherMethod?.account_number || '-'}
+                            </span>
+                            {selectedOtherMethod?.account_number && (
+                              <Button
+                                type='button'
+                                variant='outline'
+                                size='sm'
+                                className='h-7 px-2'
+                                onClick={() => {
+                                  navigator.clipboard.writeText(
+                                    selectedOtherMethod.account_number
+                                  )
+                                  toast.success(t('Copied account number'))
+                                }}
+                              >
+                                <Copy className='h-3.5 w-3.5' />
+                              </Button>
+                            )}
+                          </div>
                         </div>
-                      )}
+                        {selectedOtherMethod?.note && (
+                          <div className='border-t pt-3 text-sm'>
+                            <p className='text-muted-foreground'>
+                              {selectedOtherMethod.note}
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className='space-y-4 rounded-lg border p-4'>
-                  <div className='space-y-2'>
-                    <Label htmlFor='other-bank-from'>
-                      {t('Bank you transferred from')}
-                    </Label>
-                    <Input
-                      id='other-bank-from'
-                      value={otherBankFrom}
-                      onChange={(e) => setOtherBankFrom(e.target.value)}
-                      placeholder={t('Optional bank name')}
-                    />
-                  </div>
+                  <div className='space-y-4 rounded-lg border p-4'>
+                    <div className='space-y-2'>
+                      <Label htmlFor='other-bank-from'>
+                        {t('Bank you transferred from')}
+                      </Label>
+                      <Input
+                        id='other-bank-from'
+                        value={otherBankFrom}
+                        onChange={(e) => setOtherBankFrom(e.target.value)}
+                        placeholder={t('Optional bank name')}
+                      />
+                    </div>
 
-                  <div className='space-y-2'>
-                    <Label htmlFor='other-slip'>
-                      {t('Upload transfer slip')}
-                    </Label>
-                    <label
-                      htmlFor='other-slip'
-                      className='hover:bg-muted/40 flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-4 text-center'
+                    <div className='space-y-2'>
+                      <Label htmlFor='other-slip'>
+                        {t('Upload transfer slip')}
+                      </Label>
+                      <label
+                        htmlFor='other-slip'
+                        className='hover:bg-muted/40 flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-4 text-center'
+                      >
+                        <UploadCloud className='text-muted-foreground h-6 w-6' />
+                        <span className='text-sm font-medium'>
+                          {otherSlipName || t('Choose slip file')}
+                        </span>
+                        <span className='text-muted-foreground text-xs'>
+                          JPG, PNG, WEBP หรือ PDF ไม่เกิน 5 MB
+                        </span>
+                      </label>
+                      <input
+                        id='other-slip'
+                        type='file'
+                        accept='.jpg,.jpeg,.png,.webp,.pdf'
+                        className='hidden'
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] || null
+                          setOtherSlipFile(file)
+                          setOtherSlipName(file?.name || '')
+                        }}
+                      />
+                    </div>
+
+                    <Button
+                      type='button'
+                      className='w-full'
+                      disabled={
+                        !canSubmitOtherPayment || submittingOtherPayment
+                      }
+                      onClick={handleOtherPaymentSubmit}
                     >
-                      <UploadCloud className='text-muted-foreground h-6 w-6' />
-                      <span className='text-sm font-medium'>
-                        {otherSlipName || t('Choose slip file')}
-                      </span>
-                      <span className='text-muted-foreground text-xs'>
-                        JPG, PNG, WEBP หรือ PDF ไม่เกิน 5 MB
-                      </span>
-                    </label>
-                    <input
-                      id='other-slip'
-                      type='file'
-                      accept='.jpg,.jpeg,.png,.webp,.pdf'
-                      className='hidden'
-                      onChange={(e) => {
-                        const file = e.target.files?.[0] || null
-                        setOtherSlipFile(file)
-                        setOtherSlipName(file?.name || '')
-                      }}
-                    />
+                      {submittingOtherPayment && (
+                        <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                      )}
+                      {t('Submit top-up request')}
+                    </Button>
                   </div>
-
-                  <Button
-                    type='button'
-                    className='w-full'
-                    disabled={!canSubmitOtherPayment || submittingOtherPayment}
-                    onClick={handleOtherPaymentSubmit}
-                  >
-                    {submittingOtherPayment && (
-                      <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                    )}
-                    {t('Submit top-up request')}
-                  </Button>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
           {legacyTopupEnabled && (
             <>

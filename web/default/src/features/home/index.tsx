@@ -49,6 +49,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '@/stores/auth-store'
+import { useStatus } from '@/hooks/use-status'
 import { Button } from '@/components/ui/button'
 import { Markdown } from '@/components/ui/markdown'
 import { CopyButton } from '@/components/copy-button'
@@ -332,6 +333,9 @@ function FloatingContactButtons() {
 }
 
 function FloatingLeaderboardButton() {
+  const { status } = useStatus()
+  if (status?.user_leaderboard_enabled !== true) return null
+
   return (
     <aside className='fixed bottom-16 left-3 z-40 md:bottom-20 md:left-5'>
       <Link
@@ -714,19 +718,6 @@ export function Home() {
                 >
                   เริ่มต้นใช้งาน
                   <ArrowRight className='size-4' />
-                </Button>
-                <Button
-                  variant='outline'
-                  className='h-12 rounded-xl px-6'
-                  render={
-                    <Link
-                      to='/rankings'
-                      search={{ view: 'users', period: 'month' }}
-                    />
-                  }
-                >
-                  <Trophy className='size-4 text-amber-500' />
-                  ดูอันดับผู้ใช้งาน
                 </Button>
                 <Button
                   variant='outline'
