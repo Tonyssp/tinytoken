@@ -8,7 +8,7 @@
 
 ## Endpoint และ Header
 
-          **Method**
+**Method**
 
 ```
 POST
@@ -34,7 +34,7 @@ application/json
 
 ## Parameters หลัก
 
-          | PARAMETER | REQUIRED | DESCRIPTION |
+| PARAMETER | REQUIRED | DESCRIPTION |
 | --- | --- | --- |
 | model | ใช่ | Model ID ที่รองรับ image-generation |
 | prompt | ใช่ | รายละเอียดรูปภาพที่ต้องการสร้าง |
@@ -47,10 +47,10 @@ application/json
 
 ## ตัวอย่างสร้างภาพ
 
-            เปลี่ยน `ชื่อโมเดลสร้างภาพ` เป็น Model ID ที่มี
-            `image-generation` ในรายการ endpoint ที่รองรับ
+เปลี่ยน `ชื่อโมเดลสร้างภาพ` เป็น Model ID ที่มี
+`image-generation` ในรายการ endpoint ที่รองรับ
 
-          **cURL**
+**cURL**
 
 ```bash
 curl https://api.tinyapi.org/v1/images/generations \\
@@ -67,10 +67,10 @@ curl https://api.tinyapi.org/v1/images/generations \\
 
 ## รูปแบบผลลัพธ์
 
-            เมื่อใช้ `response_format: url`
-            ผู้ให้บริการที่รองรับจะคืน URL ของรูปภาพ
+เมื่อใช้ `response_format: url`
+ผู้ให้บริการที่รองรับจะคืน URL ของรูปภาพ
 
-          **Example response**
+**Example response**
 
 ```json
 {
@@ -84,17 +84,17 @@ curl https://api.tinyapi.org/v1/images/generations \\
 }
 ```
 
-            ถ้าเลือก `b64_json` และโมเดลรองรับ
-            ผลลัพธ์จะอยู่ใน field `data[0].b64_json`
-            ซึ่งต้องนำไป decode และบันทึกเป็นไฟล์รูปภาพ
+ถ้าเลือก `b64_json` และโมเดลรองรับ
+ผลลัพธ์จะอยู่ใน field `data[0].b64_json`
+ซึ่งต้องนำไป decode และบันทึกเป็นไฟล์รูปภาพ
 
 ## ข้อควรรู้
 
-            - API Key ต้องมีสิทธิ์ใช้โมเดลสร้างภาพ หากเปิด Model limits ไว้
-              ต้องเพิ่มโมเดลนั้นเข้าไปในคีย์ด้วย
-            - ขนาด จำนวนรูป คุณภาพ และ response format ที่รองรับแตกต่างกันตาม provider
-              ให้ดูรายละเอียดของโมเดลก่อนใช้งาน
-            - การแก้ไขภาพใช้ endpoint `/v1/images/edits`
-              ซึ่งเป็นคนละรูปแบบคำขอกับการสร้างภาพใหม่
-            - ถ้าได้ error `model_not_found`
-              ให้ตรวจว่าเลือกโมเดลที่รองรับ image-generation และสะกดชื่อถูกต้อง
+- API Key ต้องมีสิทธิ์ใช้โมเดลสร้างภาพ หากเปิด Model limits ไว้
+ต้องเพิ่มโมเดลนั้นเข้าไปในคีย์ด้วย
+- ขนาด จำนวนรูป คุณภาพ และ response format ที่รองรับแตกต่างกันตาม provider
+ให้ดูรายละเอียดของโมเดลก่อนใช้งาน
+- การแก้ไขภาพใช้ endpoint `/v1/images/edits`
+ซึ่งเป็นคนละรูปแบบคำขอกับการสร้างภาพใหม่
+- ถ้าได้ error `model_not_found`
+ให้ตรวจว่าเลือกโมเดลที่รองรับ image-generation และสะกดชื่อถูกต้อง

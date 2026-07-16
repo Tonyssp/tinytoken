@@ -8,7 +8,7 @@
 
 ## Endpoint และ Header
 
-          **Method**
+**Method**
 
 ```
 POST
@@ -39,12 +39,12 @@ application/json
 ```
 
 >
-            `anthropic-version: 2023-06-01` คือเวอร์ชัน protocol
-            ของ Anthropic Messages API ไม่ใช่ปีของโมเดล และไม่ควรเปลี่ยนเอง
+`anthropic-version: 2023-06-01` คือเวอร์ชัน protocol
+ของ Anthropic Messages API ไม่ใช่ปีของโมเดล และไม่ควรเปลี่ยนเอง
 
 ## Parameters หลัก
 
-          | PARAMETER | REQUIRED | DESCRIPTION |
+| PARAMETER | REQUIRED | DESCRIPTION |
 | --- | --- | --- |
 | model | ใช่ | Model ID ที่รองรับ anthropic จาก /v1/models |
 | messages | ใช่ | รายการข้อความสนทนา role และ content |
@@ -57,10 +57,10 @@ application/json
 
 ## Non-streaming
 
-            เปลี่ยน `ชื่อโมเดล-Claude` เป็น Model ID จริงจากหน้า
-            รายการโมเดล
+เปลี่ยน `ชื่อโมเดล-Claude` เป็น Model ID จริงจากหน้า
+รายการโมเดล
 
-          **cURL**
+**cURL**
 
 ```bash
 curl https://api.tinyapi.org/v1/messages \\
@@ -78,7 +78,7 @@ curl https://api.tinyapi.org/v1/messages \\
     ]
   }'
 ```
-          **Example response**
+**Example response**
 
 ```json
 {
@@ -102,10 +102,10 @@ curl https://api.tinyapi.org/v1/messages \\
 
 ## Streaming
 
-            เมื่อกำหนด `stream: true` ระบบจะส่งข้อมูลแบบ SSE
-            ต่อเนื่อง เหมาะกับแชตหรือ Claude Code ที่ต้องแสดงข้อความระหว่างสร้างคำตอบ
+เมื่อกำหนด `stream: true` ระบบจะส่งข้อมูลแบบ SSE
+ต่อเนื่อง เหมาะกับแชตหรือ Claude Code ที่ต้องแสดงข้อความระหว่างสร้างคำตอบ
 
-          **cURL streaming**
+**cURL streaming**
 
 ```bash
 curl https://api.tinyapi.org/v1/messages \\
@@ -127,9 +127,9 @@ curl https://api.tinyapi.org/v1/messages \\
 
 ## ข้อควรรู้
 
-            - เลือกโมเดลที่มี `anthropic` ใน
-              `supported_endpoint_types`
-            - สามารถใช้ `x-api-key: sk-...` แทน Authorization
-              กับ endpoint นี้ได้ แต่ตัวอย่างของ TinyAPI ใช้ Authorization เพื่อให้จำง่าย
-            - ความสามารถ tools, thinking, cache และ parameter ขั้นสูงขึ้นกับโมเดลและ upstream
-              ที่ให้บริการโมเดลนั้น
+- เลือกโมเดลที่มี `anthropic` ใน
+`supported_endpoint_types`
+- สามารถใช้ `x-api-key: sk-...` แทน Authorization
+กับ endpoint นี้ได้ แต่ตัวอย่างของ TinyAPI ใช้ Authorization เพื่อให้จำง่าย
+- ความสามารถ tools, thinking, cache และ parameter ขั้นสูงขึ้นกับโมเดลและ upstream
+ที่ให้บริการโมเดลนั้น

@@ -8,10 +8,10 @@
 
 ## Endpoint
 
-            ใช้ endpoint นี้เพื่อดึงรายการโมเดลตามกลุ่ม สิทธิ์ และข้อจำกัดของ API Key
-            ที่ส่งมากับคำขอ
+ใช้ endpoint นี้เพื่อดึงรายการโมเดลตามกลุ่ม สิทธิ์ และข้อจำกัดของ API Key
+ที่ส่งมากับคำขอ
 
-          **Method**
+**Method**
 
 ```
 GET
@@ -31,13 +31,13 @@ Authorization: Bearer sk-YOUR_API_KEY
 
 ## ตัวอย่างคำสั่ง
 
-          **cURL**
+**cURL**
 
 ```bash
 curl https://api.tinyapi.org/v1/models \\
   -H "Authorization: Bearer sk-YOUR_API_KEY"
 ```
-          **Example response**
+**Example response**
 
 ```json
 {
@@ -60,7 +60,7 @@ curl https://api.tinyapi.org/v1/models \\
 
 ## อ่านผลลัพธ์
 
-          | FIELD | DESCRIPTION |
+| FIELD | DESCRIPTION |
 | --- | --- |
 | id | ชื่อ Model ID ที่ต้องนำไปใส่ใน field model ตอนเรียก API |
 | object | ประเภทข้อมูล โดยรายการโมเดลจะเป็น model |
@@ -68,12 +68,12 @@ curl https://api.tinyapi.org/v1/models \\
 | supported_endpoint_types | รายการ protocol หรือ endpoint ที่โมเดลนี้รองรับ |
 
 >
-            ให้คัดลอกค่า `id` ไปวางใน field
-            `model` แบบตรงทุกตัวอักษร อย่าใช้ชื่อที่คาดเดาเอง
+ให้คัดลอกค่า `id` ไปวางใน field
+`model` แบบตรงทุกตัวอักษร อย่าใช้ชื่อที่คาดเดาเอง
 
 ## ประเภท endpoint
 
-          | VALUE | ENDPOINT ที่เกี่ยวข้อง |
+| VALUE | ENDPOINT ที่เกี่ยวข้อง |
 | --- | --- |
 | openai | /v1/chat/completions |
 | openai-response | /v1/responses |
@@ -82,5 +82,5 @@ curl https://api.tinyapi.org/v1/models \\
 | image-generation | /v1/images/generations |
 | embeddings | /v1/embeddings |
 
-            โมเดลหนึ่งตัวอาจรองรับมากกว่าหนึ่งประเภท หากไม่เห็นประเภทที่ต้องการ
-            ให้เลือกโมเดลอื่นหรือดูรายละเอียดจากหน้า All AI Model
+โมเดลหนึ่งตัวอาจรองรับมากกว่าหนึ่งประเภท หากไม่เห็นประเภทที่ต้องการ
+ให้เลือกโมเดลอื่นหรือดูรายละเอียดจากหน้า All AI Model

@@ -8,7 +8,7 @@
 
 ## Endpoint และ Header
 
-          **Method**
+**Method**
 
 ```
 POST
@@ -34,7 +34,7 @@ application/json
 
 ## Parameters หลัก
 
-          | PARAMETER | REQUIRED | DESCRIPTION |
+| PARAMETER | REQUIRED | DESCRIPTION |
 | --- | --- | --- |
 | model | ใช่ | Model ID ที่รองรับ openai จาก /v1/models |
 | messages | ใช่ | ประวัติสนทนา เช่น system, user และ assistant |
@@ -49,7 +49,7 @@ application/json
 
 ## Non-streaming
 
-          **cURL**
+**cURL**
 
 ```bash
 curl https://api.tinyapi.org/v1/chat/completions \\
@@ -65,7 +65,7 @@ curl https://api.tinyapi.org/v1/chat/completions \\
     ]
   }'
 ```
-          **Example response**
+**Example response**
 
 ```json
 {
@@ -92,11 +92,11 @@ curl https://api.tinyapi.org/v1/chat/completions \\
 
 ## Streaming
 
-            เมื่อใช้ `stream: true` ระบบจะส่ง
-            `chat.completion.chunk` หลายชุดและปิดท้าย stream
-            ตามรูปแบบที่ upstream รองรับ
+เมื่อใช้ `stream: true` ระบบจะส่ง
+`chat.completion.chunk` หลายชุดและปิดท้าย stream
+ตามรูปแบบที่ upstream รองรับ
 
-          **cURL streaming**
+**cURL streaming**
 
 ```bash
 curl https://api.tinyapi.org/v1/chat/completions \\
@@ -116,8 +116,8 @@ curl https://api.tinyapi.org/v1/chat/completions \\
 
 ## ข้อควรรู้
 
-            - Endpoint นี้ใช้ได้กับทุกโมเดลที่ประกาศ
-              `openai` ไม่จำเป็นต้องเป็นโมเดลจาก OpenAI เท่านั้น
-            - Parameter ขั้นสูงอาจไม่รองรับทุกโมเดล ให้ดู Supported parameters
-              ในหน้า All AI Model ก่อนใช้งาน
-            - สำหรับ SDK ให้ตั้ง Base URL เป็น `https://api.tinyapi.org/v1`
+- Endpoint นี้ใช้ได้กับทุกโมเดลที่ประกาศ
+`openai` ไม่จำเป็นต้องเป็นโมเดลจาก OpenAI เท่านั้น
+- Parameter ขั้นสูงอาจไม่รองรับทุกโมเดล ให้ดู Supported parameters
+ในหน้า All AI Model ก่อนใช้งาน
+- สำหรับ SDK ให้ตั้ง Base URL เป็น `https://api.tinyapi.org/v1`

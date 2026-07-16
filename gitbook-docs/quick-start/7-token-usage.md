@@ -8,10 +8,10 @@
 
 ## Endpoint
 
-            TinyAPI ใช้ endpoint ด้านล่างสำหรับตรวจข้อมูลและเครดิตของ API Key โดยตรง
-            คำขอนี้ใช้ API Key ที่ขึ้นต้นด้วย `sk-`
+TinyAPI ใช้ endpoint ด้านล่างสำหรับตรวจข้อมูลและเครดิตของ API Key โดยตรง
+คำขอนี้ใช้ API Key ที่ขึ้นต้นด้วย `sk-`
 
-          **Method**
+**Method**
 
 ```
 GET
@@ -30,22 +30,22 @@ Authorization: Bearer sk-YOUR_API_KEY
 ```
 
 >
-            Endpoint นี้เป็นของ TinyAPI โดยเฉพาะ จึงใช้ path
-            `/api/usage/token` ไม่ใช่
-            `/v1/me` หรือ `/v1/usage`
+Endpoint นี้เป็นของ TinyAPI โดยเฉพาะ จึงใช้ path
+`/api/usage/token` ไม่ใช่
+`/v1/me` หรือ `/v1/usage`
 
 ## ตัวอย่างคำสั่ง
 
-            เปิด Command Prompt, PowerShell หรือ Terminal แล้วแทนที่
-            `sk-YOUR_API_KEY` ด้วยคีย์ของคุณ
+เปิด Command Prompt, PowerShell หรือ Terminal แล้วแทนที่
+`sk-YOUR_API_KEY` ด้วยคีย์ของคุณ
 
-          **cURL**
+**cURL**
 
 ```bash
 curl https://api.tinyapi.org/api/usage/token \\
   -H "Authorization: Bearer sk-YOUR_API_KEY"
 ```
-          **Example response**
+**Example response**
 
 ```json
 {
@@ -67,7 +67,7 @@ curl https://api.tinyapi.org/api/usage/token \\
 
 ## ข้อมูลที่ได้รับ
 
-          | FIELD | TYPE | DESCRIPTION |
+| FIELD | TYPE | DESCRIPTION |
 | --- | --- | --- |
 | name | string | ชื่อ API Key ที่กำหนดไว้ตอนสร้างคีย์ |
 | total_granted | number | เครดิตหรือโควตารวมของ API Key ก่อนหักการใช้งาน |
@@ -80,10 +80,10 @@ curl https://api.tinyapi.org/api/usage/token \\
 
 ## ข้อควรรู้
 
-            - ค่าเครดิตจาก endpoint นี้เป็นหน่วยโควตาภายในของ TinyAPI
-              การแสดงเป็นเงินหรือเครดิตบนหน้าเว็บขึ้นกับการตั้งค่าของระบบ
-            - Endpoint นี้แสดงข้อมูลของ API Key แต่ไม่ส่งอีเมลหรือข้อมูลส่วนตัวของเจ้าของบัญชี
-            - ถ้าต้องการดูยอดในรูปแบบหน้าเว็บ ให้เปิดหน้า
+- ค่าเครดิตจาก endpoint นี้เป็นหน่วยโควตาภายในของ TinyAPI
+การแสดงเป็นเงินหรือเครดิตบนหน้าเว็บขึ้นกับการตั้งค่าของระบบ
+- Endpoint นี้แสดงข้อมูลของ API Key แต่ไม่ส่งอีเมลหรือข้อมูลส่วนตัวของเจ้าของบัญชี
+- ถ้าต้องการดูยอดในรูปแบบหน้าเว็บ ให้เปิดหน้า
 
-                กระเป๋าเงิน
-            - แม้คีย์หมดเครดิตหรือหมดอายุ endpoint แบบอ่านอย่างเดียวนี้ยังใช้ตรวจข้อมูลคีย์ได้
+กระเป๋าเงิน
+- แม้คีย์หมดเครดิตหรือหมดอายุ endpoint แบบอ่านอย่างเดียวนี้ยังใช้ตรวจข้อมูลคีย์ได้
