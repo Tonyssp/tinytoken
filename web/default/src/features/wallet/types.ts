@@ -72,6 +72,10 @@ export interface OtherPaymentMethod {
   account_number: string
   qr_image_url?: string
   note?: string
+  currency?: string
+  rate?: number
+  min_topup?: number
+  amount_options?: number[]
   enabled?: boolean
 }
 
@@ -189,15 +193,15 @@ export interface TopupInfo {
   promptpay_transaction_export?: boolean
   /** Whether Laos manual payment is enabled */
   enable_other_payment_topup?: boolean
-  /** Other payment currency, fixed to LAK for this design */
+  /** Shared fallback currency for other/manual payment methods */
   other_payment_currency?: string
-  /** Credits granted per LAK */
+  /** Shared fallback credits granted per currency unit */
   other_payment_rate?: number
-  /** Minimum Laos transfer amount in LAK */
+  /** Shared fallback minimum transfer amount */
   other_payment_min_topup?: number
-  /** Suggested Laos transfer amounts in LAK */
+  /** Shared fallback suggested transfer amounts */
   other_payment_amount_options?: number[]
-  /** Laos bank/manual payment methods */
+  /** Bank/manual payment methods */
   other_payment_methods?: OtherPaymentMethod[]
   /** Whether redemption code usage is enabled */
   enable_redemption?: boolean

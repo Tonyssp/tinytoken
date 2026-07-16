@@ -317,6 +317,31 @@ func findOtherPaymentMethod(methodID string) (operation_setting.OtherPaymentMeth
 	return operation_setting.OtherPaymentMethod{}, false
 }
 
+func getOtherPaymentMethodCurrency(method operation_setting.OtherPaymentMethod, setting *operation_setting.PaymentSetting) string {
+	currency := strings.TrimSpace(method.Currency)
+	if currency == "" {
+		currency = strings.TrimSpace(setting.OtherPaymentCurrency)
+	}
+	if currency == "" {
+		return "LAK"
+	}
+	return strings.ToUpper(currency)
+}
+
+func getOtherPaymentMethodRate(method operation_setting.OtherPaymentMethod, setting *operation_setting.PaymentSetting) float64 {
+	if method.Rate > 0 {
+		return method.Rate
+	}
+	return setting.OtherPaymentRate
+}
+
+func getOtherPaymentMethodMinTopUp(method operation_setting.OtherPaymentMethod, setting *operation_setting.PaymentSetting) float64 {
+	if method.MinTopUp > 0 {
+		return method.MinTopUp
+	}
+	return setting.OtherPaymentMinTopUp
+}
+
 func saveTopupSlip(tradeNo string, header *multipart.FileHeader) (string, []byte, error) {
 	file, err := header.Open()
 	if err != nil {
@@ -467,12 +492,13 @@ func notifyLineOtherPayment(setting *operation_setting.PaymentSetting, text stri
 	defer resp.Body.Close()
 }
 
-func buildOtherPaymentNotification(tradeNo string, userID int, amount int64, creditAmount int64, method operation_setting.OtherPaymentMethod, bankFrom string) string {
+func buildOtherPaymentNotification(tradeNo string, userID int, amount int64, creditAmount int64, method operation_setting.OtherPaymentMethod, bankFrom string, currency string) string {
 	return fmt.Sprintf(
-		"New Laos manual top-up\nTrade: %s\nUser ID: %d\nAmount: %s LAK\nCredit: %d\nMethod: %s\nBank from: %s\n\nTelegram: reply 1 to approve or 2 to reject\nOr send: 1 %s / 2 %s\nLINE confirm: send: 1 %s",
+		"New manual top-up\nTrade: %s\nUser ID: %d\nAmount: %s %s\nCredit: %d\nMethod: %s\nBank from: %s\n\nTelegram: reply 1 to approve or 2 to reject\nOr send: 1 %s / 2 %s\nLINE confirm: send: 1 %s",
 		tradeNo,
 		userID,
 		formatIntWithCommas(amount),
+		currency,
 		creditAmount,
 		method.Name,
 		bankFrom,
@@ -690,15 +716,19 @@ func RequestOtherPaymentTopUp(c *gin.Context) {
 		common.ApiErrorMsg(c, "Invalid amount")
 		return
 	}
-	if amount < int64(paymentSetting.OtherPaymentMinTopUp) {
-		common.ApiErrorMsg(c, fmt.Sprintf("Minimum top-up is %d LAK", int64(paymentSetting.OtherPaymentMinTopUp)))
-		return
-	}
 
 	methodID := strings.TrimSpace(c.PostForm("method_id"))
 	method, ok := findOtherPaymentMethod(methodID)
 	if !ok {
 		common.ApiErrorMsg(c, "Payment method is not available")
+		return
+	}
+	currency := getOtherPaymentMethodCurrency(method, paymentSetting)
+	minTopUp := getOtherPaymentMethodMinTopUp(method, paymentSetting)
+	rate := getOtherPaymentMethodRate(method, paymentSetting)
+
+	if amount < int64(minTopUp) {
+		common.ApiErrorMsg(c, fmt.Sprintf("Minimum top-up is %d %s", int64(minTopUp), currency))
 		return
 	}
 
@@ -707,15 +737,15 @@ func RequestOtherPaymentTopUp(c *gin.Context) {
 		bankFrom = method.BankName
 	}
 
-	slip, err := c.FormFile("slip")
-	if err != nil {
-		common.ApiErrorMsg(c, "Slip file is required")
+	creditAmount := int64(decimal.NewFromInt(amount).Mul(decimal.NewFromFloat(rate)).IntPart())
+	if creditAmount <= 0 {
+		common.ApiErrorMsg(c, "Invalid credit rate")
 		return
 	}
 
-	creditAmount := int64(decimal.NewFromInt(amount).Mul(decimal.NewFromFloat(paymentSetting.OtherPaymentRate)).IntPart())
-	if creditAmount <= 0 {
-		common.ApiErrorMsg(c, "Invalid credit rate")
+	slip, err := c.FormFile("slip")
+	if err != nil {
+		common.ApiErrorMsg(c, "Slip file is required")
 		return
 	}
 
@@ -742,7 +772,7 @@ func RequestOtherPaymentTopUp(c *gin.Context) {
 		return
 	}
 
-	message := buildOtherPaymentNotification(tradeNo, userID, amount, creditAmount, method, bankFrom)
+	message := buildOtherPaymentNotification(tradeNo, userID, amount, creditAmount, method, bankFrom, currency)
 	go notifyTelegramOtherPayment(paymentSetting, tradeNo, message, slip.Filename, slipBytes)
 	go notifyLineOtherPayment(paymentSetting, message)
 

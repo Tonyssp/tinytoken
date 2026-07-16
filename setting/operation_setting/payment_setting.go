@@ -55,6 +55,10 @@ type OtherPaymentMethod struct {
 	AccountNumber string `json:"account_number"`
 	QRImageURL    string `json:"qr_image_url"`
 	Note          string `json:"note"`
+	Currency      string `json:"currency,omitempty"`
+	Rate          float64 `json:"rate,omitempty"`
+	MinTopUp      float64 `json:"min_topup,omitempty"`
+	AmountOptions []int   `json:"amount_options,omitempty"`
 	Enabled       bool   `json:"enabled"`
 }
 

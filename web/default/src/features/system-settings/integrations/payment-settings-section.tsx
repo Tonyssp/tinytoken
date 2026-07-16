@@ -244,7 +244,18 @@ type EditableOtherPaymentMethod = {
   account_number: string
   qr_image_url: string
   note: string
+  currency: string
+  rate: number
+  min_topup: number
+  amount_options: number[]
   enabled: boolean
+}
+
+function parseNumberArray(value: unknown): number[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((item) => Number(item))
+    .filter((item) => Number.isFinite(item) && item > 0)
 }
 
 function parseOtherPaymentMethods(value: string): EditableOtherPaymentMethod[] {
@@ -265,6 +276,10 @@ function parseOtherPaymentMethods(value: string): EditableOtherPaymentMethod[] {
         account_number: String(item.account_number || ''),
         qr_image_url: String(item.qr_image_url || ''),
         note: String(item.note || ''),
+        currency: String(item.currency || ''),
+        rate: Number(item.rate || 0),
+        min_topup: Number(item.min_topup || 0),
+        amount_options: parseNumberArray(item.amount_options),
         enabled: item.enabled !== false,
       }))
   } catch {
@@ -275,12 +290,27 @@ function parseOtherPaymentMethods(value: string): EditableOtherPaymentMethod[] {
 function OtherPaymentMethodsVisualEditor({
   value,
   onChange,
+  defaultCurrency,
+  defaultRate,
+  defaultMinTopUp,
+  defaultAmountOptions,
 }: {
   value: string
   onChange: (value: string) => void
+  defaultCurrency: string
+  defaultRate: number
+  defaultMinTopUp: number
+  defaultAmountOptions: string
 }) {
   const { t } = useTranslation()
   const methods = React.useMemo(() => parseOtherPaymentMethods(value), [value])
+  const sharedAmountOptions = React.useMemo(() => {
+    try {
+      return parseNumberArray(JSON.parse(defaultAmountOptions || '[]'))
+    } catch {
+      return []
+    }
+  }, [defaultAmountOptions])
 
   const commit = React.useCallback(
     (next: EditableOtherPaymentMethod[]) => {
@@ -301,6 +331,10 @@ function OtherPaymentMethodsVisualEditor({
         account_number: '',
         qr_image_url: '',
         note: '',
+        currency: '',
+        rate: 0,
+        min_topup: 0,
+        amount_options: [],
         enabled: true,
       },
     ])
@@ -315,6 +349,36 @@ function OtherPaymentMethodsVisualEditor({
         methodIndex === index ? { ...method, ...patch } : method
       )
     )
+  }
+
+  const setUseSharedSettings = (index: number, useShared: boolean) => {
+    if (useShared) {
+      updateMethod(index, {
+        currency: '',
+        rate: 0,
+        min_topup: 0,
+        amount_options: [],
+      })
+      return
+    }
+
+    updateMethod(index, {
+      currency: defaultCurrency || 'LAK',
+      rate: Number(defaultRate || 0),
+      min_topup: Number(defaultMinTopUp || 0),
+      amount_options: sharedAmountOptions,
+    })
+  }
+
+  const copyFirstPaymentSettings = (index: number) => {
+    const first = methods[0]
+    if (!first) return
+    updateMethod(index, {
+      currency: first.currency,
+      rate: first.rate,
+      min_topup: first.min_topup,
+      amount_options: first.amount_options,
+    })
   }
 
   return (
@@ -352,125 +416,258 @@ function OtherPaymentMethodsVisualEditor({
               key={method.id}
               className='bg-muted/10 space-y-4 rounded-lg border p-4'
             >
-              <div className='flex items-center justify-between gap-3'>
-                <div className='min-w-0'>
-                  <p className='truncate font-semibold'>
-                    {method.name || `${t('Payment method')} ${index + 1}`}
-                  </p>
-                  <p className='text-muted-foreground text-xs'>
-                    {t('Payment method')} {index + 1}
-                  </p>
-                </div>
-                <div className='flex shrink-0 items-center gap-2'>
-                  <span className='text-muted-foreground text-xs'>
-                    {t('Enabled')}
-                  </span>
-                  <Switch
-                    checked={method.enabled}
-                    onCheckedChange={(checked) =>
-                      updateMethod(index, { enabled: checked })
-                    }
-                  />
-                  <Button
-                    type='button'
-                    variant='ghost'
-                    size='icon'
-                    className='text-destructive hover:text-destructive size-9'
-                    aria-label={t('Remove payment method')}
-                    title={t('Remove payment method')}
-                    onClick={() =>
-                      commit(
-                        methods.filter((_, itemIndex) => itemIndex !== index)
-                      )
-                    }
-                  >
-                    <Trash2 className='size-4' />
-                  </Button>
-                </div>
-              </div>
+              {(() => {
+                const usesSharedSettings =
+                  !method.currency &&
+                  !method.rate &&
+                  !method.min_topup &&
+                  method.amount_options.length === 0
 
-              <div className='grid gap-3 sm:grid-cols-2'>
-                <FormItem>
-                  <FormLabel>{t('Payment method name')}</FormLabel>
-                  <FormControl>
-                    <Input
-                      value={method.name}
-                      placeholder='BCEL One'
-                      onChange={(event) =>
-                        updateMethod(index, { name: event.target.value })
-                      }
-                    />
-                  </FormControl>
-                </FormItem>
-                <FormItem>
-                  <FormLabel>{t('Bank name')}</FormLabel>
-                  <FormControl>
-                    <Input
-                      value={method.bank_name}
-                      placeholder='BCEL'
-                      onChange={(event) =>
-                        updateMethod(index, { bank_name: event.target.value })
-                      }
-                    />
-                  </FormControl>
-                </FormItem>
-                <FormItem>
-                  <FormLabel>{t('Account name')}</FormLabel>
-                  <FormControl>
-                    <Input
-                      value={method.account_name}
-                      onChange={(event) =>
-                        updateMethod(index, {
-                          account_name: event.target.value,
-                        })
-                      }
-                    />
-                  </FormControl>
-                </FormItem>
-                <FormItem>
-                  <FormLabel>{t('Account number')}</FormLabel>
-                  <FormControl>
-                    <Input
-                      value={method.account_number}
-                      onChange={(event) =>
-                        updateMethod(index, {
-                          account_number: event.target.value,
-                        })
-                      }
-                    />
-                  </FormControl>
-                </FormItem>
-                <FormItem className='sm:col-span-2'>
-                  <FormLabel>{t('QR image URL')}</FormLabel>
-                  <FormControl>
-                    <Input
-                      type='url'
-                      value={method.qr_image_url}
-                      placeholder='https://example.com/payment-qr.png'
-                      onChange={(event) =>
-                        updateMethod(index, {
-                          qr_image_url: event.target.value,
-                        })
-                      }
-                    />
-                  </FormControl>
-                </FormItem>
-                <FormItem className='sm:col-span-2'>
-                  <FormLabel>{t('Member instructions')}</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      rows={3}
-                      value={method.note}
-                      placeholder={t(
-                        'Transfer the exact amount, then upload the slip below.'
+                return (
+                  <>
+                    <div className='flex items-center justify-between gap-3'>
+                      <div className='min-w-0'>
+                        <p className='truncate font-semibold'>
+                          {method.name || `${t('Payment method')} ${index + 1}`}
+                        </p>
+                        <p className='text-muted-foreground text-xs'>
+                          {t('Payment method')} {index + 1}
+                        </p>
+                      </div>
+                      <div className='flex shrink-0 items-center gap-2'>
+                        <span className='text-muted-foreground text-xs'>
+                          {t('Enabled')}
+                        </span>
+                        <Switch
+                          checked={method.enabled}
+                          onCheckedChange={(checked) =>
+                            updateMethod(index, { enabled: checked })
+                          }
+                        />
+                        <Button
+                          type='button'
+                          variant='ghost'
+                          size='icon'
+                          className='text-destructive hover:text-destructive size-9'
+                          aria-label={t('Remove payment method')}
+                          title={t('Remove payment method')}
+                          onClick={() =>
+                            commit(
+                              methods.filter(
+                                (_, itemIndex) => itemIndex !== index
+                              )
+                            )
+                          }
+                        >
+                          <Trash2 className='size-4' />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className='bg-background rounded-lg border p-3'>
+                      <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+                        <div>
+                          <p className='text-sm font-medium'>
+                            {t('Rate settings for this method')}
+                          </p>
+                          <p className='text-muted-foreground text-xs'>
+                            {usesSharedSettings
+                              ? t(
+                                  'Using shared currency, rate, minimum, and preset amounts'
+                                )
+                              : t(
+                                  'Using custom currency, rate, minimum, and preset amounts'
+                                )}
+                          </p>
+                        </div>
+                        <div className='flex flex-wrap items-center gap-2'>
+                          {index > 0 && (
+                            <Button
+                              type='button'
+                              variant='outline'
+                              size='sm'
+                              onClick={() => copyFirstPaymentSettings(index)}
+                            >
+                              {t('Copy from first method')}
+                            </Button>
+                          )}
+                          <span className='text-muted-foreground text-xs'>
+                            {t('Use shared rate')}
+                          </span>
+                          <Switch
+                            checked={usesSharedSettings}
+                            onCheckedChange={(checked) =>
+                              setUseSharedSettings(index, checked)
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      {!usesSharedSettings && (
+                        <div className='mt-4 grid gap-3 sm:grid-cols-2'>
+                          <FormItem>
+                            <FormLabel>{t('Currency')}</FormLabel>
+                            <FormControl>
+                              <Input
+                                value={method.currency}
+                                placeholder={defaultCurrency || 'LAK'}
+                                onChange={(event) =>
+                                  updateMethod(index, {
+                                    currency: event.target.value.toUpperCase(),
+                                  })
+                                }
+                              />
+                            </FormControl>
+                          </FormItem>
+                          <FormItem>
+                            <FormLabel>{t('Credit rate')}</FormLabel>
+                            <FormControl>
+                              <Input
+                                type='number'
+                                step='0.0001'
+                                min={0}
+                                value={method.rate || 0}
+                                onChange={(event) =>
+                                  updateMethod(index, {
+                                    rate: event.target.valueAsNumber || 0,
+                                  })
+                                }
+                              />
+                            </FormControl>
+                          </FormItem>
+                          <FormItem>
+                            <FormLabel>
+                              {t('Minimum transfer amount')}
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                type='number'
+                                step='1'
+                                min={0}
+                                value={method.min_topup || 0}
+                                onChange={(event) =>
+                                  updateMethod(index, {
+                                    min_topup: event.target.valueAsNumber || 0,
+                                  })
+                                }
+                              />
+                            </FormControl>
+                          </FormItem>
+                          <FormItem>
+                            <FormLabel>{t('Suggested amounts')}</FormLabel>
+                            <FormControl>
+                              <Input
+                                value={method.amount_options.join(', ')}
+                                placeholder={
+                                  sharedAmountOptions.length
+                                    ? sharedAmountOptions.join(', ')
+                                    : '30000, 50000, 100000'
+                                }
+                                onChange={(event) =>
+                                  updateMethod(index, {
+                                    amount_options: event.target.value
+                                      .split(',')
+                                      .map((item) => Number(item.trim()))
+                                      .filter(
+                                        (item) =>
+                                          Number.isFinite(item) && item > 0
+                                      ),
+                                  })
+                                }
+                              />
+                            </FormControl>
+                          </FormItem>
+                        </div>
                       )}
-                      onChange={(event) =>
-                        updateMethod(index, { note: event.target.value })
-                      }
-                    />
-                  </FormControl>
-                </FormItem>
-              </div>
+                    </div>
+
+                    <div className='grid gap-3 sm:grid-cols-2'>
+                      <FormItem>
+                        <FormLabel>{t('Payment method name')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            value={method.name}
+                            placeholder='BCEL One'
+                            onChange={(event) =>
+                              updateMethod(index, { name: event.target.value })
+                            }
+                          />
+                        </FormControl>
+                      </FormItem>
+                      <FormItem>
+                        <FormLabel>{t('Bank name')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            value={method.bank_name}
+                            placeholder='BCEL'
+                            onChange={(event) =>
+                              updateMethod(index, {
+                                bank_name: event.target.value,
+                              })
+                            }
+                          />
+                        </FormControl>
+                      </FormItem>
+                      <FormItem>
+                        <FormLabel>{t('Account name')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            value={method.account_name}
+                            onChange={(event) =>
+                              updateMethod(index, {
+                                account_name: event.target.value,
+                              })
+                            }
+                          />
+                        </FormControl>
+                      </FormItem>
+                      <FormItem>
+                        <FormLabel>{t('Account number')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            value={method.account_number}
+                            onChange={(event) =>
+                              updateMethod(index, {
+                                account_number: event.target.value,
+                              })
+                            }
+                          />
+                        </FormControl>
+                      </FormItem>
+                      <FormItem className='sm:col-span-2'>
+                        <FormLabel>{t('QR image URL')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type='url'
+                            value={method.qr_image_url}
+                            placeholder='https://example.com/payment-qr.png'
+                            onChange={(event) =>
+                              updateMethod(index, {
+                                qr_image_url: event.target.value,
+                              })
+                            }
+                          />
+                        </FormControl>
+                      </FormItem>
+                      <FormItem className='sm:col-span-2'>
+                        <FormLabel>{t('Member instructions')}</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            rows={3}
+                            value={method.note}
+                            placeholder={t(
+                              'Transfer the exact amount, then upload the slip below.'
+                            )}
+                            onChange={(event) =>
+                              updateMethod(index, { note: event.target.value })
+                            }
+                          />
+                        </FormControl>
+                      </FormItem>
+                    </div>
+                  </>
+                )
+              })()}
             </section>
           ))}
         </div>
@@ -2318,6 +2515,14 @@ export function PaymentSettingsSection({
                     <OtherPaymentMethodsVisualEditor
                       value={field.value}
                       onChange={field.onChange}
+                      defaultCurrency={form.watch('OtherPaymentCurrency')}
+                      defaultRate={Number(form.watch('OtherPaymentRate') || 0)}
+                      defaultMinTopUp={Number(
+                        form.watch('OtherPaymentMinTopUp') || 0
+                      )}
+                      defaultAmountOptions={form.watch(
+                        'OtherPaymentAmountOptions'
+                      )}
                     />
                   </FormControl>
                   <FormMessage />

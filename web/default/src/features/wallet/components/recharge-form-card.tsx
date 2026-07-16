@@ -310,9 +310,16 @@ export function RechargeFormCard({
         ? getOtherPanelKey(selectedOtherMethod.id)
         : activeTopupPanel
       : activeTopupPanel
-  const otherPaymentCurrency = topupInfo?.other_payment_currency || 'LAK'
-  const otherPaymentRate = Number(topupInfo?.other_payment_rate || 0)
-  const otherPaymentMinTopup = Number(topupInfo?.other_payment_min_topup || 0)
+  const otherPaymentCurrency =
+    selectedOtherMethod?.currency?.trim() ||
+    topupInfo?.other_payment_currency ||
+    'LAK'
+  const otherPaymentRate = Number(
+    selectedOtherMethod?.rate || topupInfo?.other_payment_rate || 0
+  )
+  const otherPaymentMinTopup = Number(
+    selectedOtherMethod?.min_topup || topupInfo?.other_payment_min_topup || 0
+  )
   const otherPaymentAmount =
     otherAmount.trim() === '' ? 0 : parseInt(otherAmount) || 0
   const otherPaymentCredits = otherPaymentAmount * otherPaymentRate
@@ -320,9 +327,11 @@ export function RechargeFormCard({
     otherAmount.trim() !== '' &&
     otherPaymentMinTopup > 0 &&
     otherPaymentAmount < otherPaymentMinTopup
-  const otherPaymentPresets = topupInfo?.other_payment_amount_options?.length
-    ? topupInfo.other_payment_amount_options
-    : [30000, 50000, 100000]
+  const otherPaymentPresets = selectedOtherMethod?.amount_options?.length
+    ? selectedOtherMethod.amount_options
+    : topupInfo?.other_payment_amount_options?.length
+      ? topupInfo.other_payment_amount_options
+      : [30000, 50000, 100000]
   const canSubmitOtherPayment =
     !!selectedOtherMethod?.id &&
     !!otherSlipFile &&
