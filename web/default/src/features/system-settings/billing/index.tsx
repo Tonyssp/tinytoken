@@ -70,7 +70,7 @@ const defaultBillingSettings: BillingSettings = {
   'payment_setting.promptpay_enabled': false,
   'payment_setting.promptpay_mode': 'manual',
   'payment_setting.promptpay_account_name': '',
-  'payment_setting.promptpay_id': '',
+  'payment_setting.promptpay_id': '0844155451',
   'payment_setting.promptpay_bank_name': 'Kasikorn Bank',
   'payment_setting.promptpay_instructions':
     'สแกน QR ด้วยแอปธนาคารของคุณ แล้วอัปโหลดสลิปด้านล่าง',

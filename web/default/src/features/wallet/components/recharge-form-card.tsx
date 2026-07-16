@@ -84,6 +84,8 @@ const BANK_OPTION_GROUPS = [
   },
 ]
 
+const DEFAULT_PROMPTPAY_ID = '0844155451'
+
 function formatPromptPayField(id: string, value: string) {
   return `${id}${value.length.toString().padStart(2, '0')}${value}`
 }
@@ -106,12 +108,12 @@ function normalizePromptPayTarget(value: string) {
   const digits = value.replace(/\D/g, '')
   if (!digits) return null
 
-  if (digits.length >= 15) {
-    return { type: '03', value: digits }
+  if (digits.length === 13 && digits.startsWith('0066')) {
+    return { type: '01', value: digits }
   }
 
-  if (digits.length === 13) {
-    return { type: '02', value: digits }
+  if (digits.length === 11 && digits.startsWith('66')) {
+    return { type: '01', value: `0066${digits.slice(2)}` }
   }
 
   if (digits.length === 10 && digits.startsWith('0')) {
@@ -122,7 +124,15 @@ function normalizePromptPayTarget(value: string) {
     return { type: '01', value: `0066${digits}` }
   }
 
-  return { type: '01', value: digits }
+  if (digits.length === 13) {
+    return { type: '02', value: digits }
+  }
+
+  if (digits.length >= 15) {
+    return { type: '03', value: digits }
+  }
+
+  return null
 }
 
 function createPromptPayPayload(promptPayId: string, amount: number) {
@@ -250,7 +260,7 @@ export function RechargeFormCard({
   const hasAnyTopup = hasConfigurableTopup || enableCreemTopup
   const promptPayEnabled = !!topupInfo?.enable_promptpay_topup
   const otherPaymentEnabled = !!topupInfo?.enable_other_payment_topup
-  const promptPayId = topupInfo?.promptpay_id?.trim() || ''
+  const promptPayId = topupInfo?.promptpay_id?.trim() || DEFAULT_PROMPTPAY_ID
   const promptPayRate = Number(topupInfo?.promptpay_rate || 0)
   const promptPayCredits = topupAmount * promptPayRate
   const promptPayMode = topupInfo?.promptpay_mode || 'manual'

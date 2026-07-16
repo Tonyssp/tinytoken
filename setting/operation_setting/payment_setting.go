@@ -65,6 +65,7 @@ var paymentSetting = PaymentSetting{
 	AmountOptions:              []int{10, 20, 50, 100, 200, 500},
 	AmountDiscount:             map[int]float64{},
 	PromptPayMode:              "manual",
+	PromptPayId:                "0844155451",
 	PromptPayInstructions:      "สแกน QR ด้วยแอปธนาคารของคุณ แล้วอัปโหลดสลิปด้านล่าง",
 	PromptPayRate:              3,
 	PromptPayMinTopUp:          20,
