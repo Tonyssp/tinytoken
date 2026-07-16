@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import type { CSSProperties, ElementType } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import {
   Azure,
@@ -36,11 +37,13 @@ import {
   BookOpen,
   Check,
   KeyRound,
+  Landmark,
   Layers3,
   Plug,
   ShieldCheck,
   Sparkles,
   Terminal,
+  Trophy,
   WalletCards,
   Zap,
 } from 'lucide-react'
@@ -52,15 +55,52 @@ import { CopyButton } from '@/components/copy-button'
 import { PublicLayout } from '@/components/layout'
 import { Footer } from '@/components/layout/components/footer'
 import {
+  TELEGRAM_SUPPORT_URL,
+  TelegramSupportDialog,
+} from '@/components/telegram-support-dialog'
+import {
   TinyTokenHeaderActions,
   tinyTokenHeaderMobileLinks,
 } from '@/components/tinytoken-header-actions'
+import { getHomeTrustMetrics } from './api'
 import { useHomePageContent } from './hooks'
 
 const API_BASE_URL = 'https://api.tinyapi.org'
 const OPENAI_BASE_URL = `${API_BASE_URL}/v1`
-const CONTACT_TELEGRAM_URL = 'https://t.me/+9_DdYIuFAQlkYTk9'
+const DOCS_URL = 'https://docs.tinyapi.org'
 const CONTACT_LINE_URL = 'https://line.me/ti/g/N3pcMe9CAc'
+const CONTACT_FACEBOOK_URL =
+  'https://www.facebook.com/share/18odMfCxkk/?mibextid=wwXIfr'
+
+const floatingContactChannels = [
+  {
+    name: 'Telegram',
+    label: 'ติดต่อ Telegram',
+    href: TELEGRAM_SUPPORT_URL,
+    image: '/contact-assets/telegram-logo.png',
+    className:
+      'border-sky-200 hover:border-sky-300 hover:shadow-[0_14px_36px_rgba(14,165,233,0.24)] dark:border-sky-500/30',
+    dotClassName: 'bg-sky-500',
+  },
+  {
+    name: 'LINE',
+    label: 'เข้าร่วม LINE',
+    href: CONTACT_LINE_URL,
+    image: '/contact-assets/line-logo.png',
+    className:
+      'border-emerald-200 hover:border-emerald-300 hover:shadow-[0_14px_36px_rgba(16,185,129,0.24)] dark:border-emerald-500/30',
+    dotClassName: 'bg-emerald-500',
+  },
+  {
+    name: 'Facebook',
+    label: 'ติดตาม Facebook',
+    href: CONTACT_FACEBOOK_URL,
+    image: '/contact-assets/facebook-logo.png',
+    className:
+      'border-blue-200 hover:border-blue-300 hover:shadow-[0_14px_36px_rgba(37,99,235,0.24)] dark:border-blue-500/30',
+    dotClassName: 'bg-blue-600',
+  },
+]
 
 const tools = [
   'Claude Code',
@@ -164,11 +204,11 @@ const pools = [
 
 function ToolMarquee() {
   return (
-    <div className='mx-auto mt-16 flex max-w-5xl flex-col items-center justify-center gap-3 text-center'>
+    <div className='mx-auto mt-10 flex max-w-5xl flex-col items-center justify-center gap-3 text-center'>
       <Button
         variant='outline'
         className='h-12 rounded-xl border-indigo-200 bg-white px-6 text-sm font-bold text-indigo-700 shadow-sm hover:bg-indigo-50 dark:border-indigo-500/30 dark:bg-slate-950 dark:text-indigo-200 dark:hover:bg-indigo-500/10'
-        render={<Link to='/docs/$slug' params={{ slug: 'register' }} />}
+        render={<a href={DOCS_URL} target='_blank' rel='noopener noreferrer' />}
       >
         <BookOpen className='size-4' />
         คู่มือสำหรับModelที่นิยม
@@ -182,35 +222,222 @@ function ToolMarquee() {
 
 function FloatingContactButtons() {
   return (
-    <div className='fixed right-4 bottom-16 z-40 flex flex-col gap-3 md:right-6 md:bottom-20'>
-      <a
-        href={CONTACT_TELEGRAM_URL}
-        target='_blank'
-        rel='noopener noreferrer'
-        aria-label='เข้ากลุ่ม Telegram'
-        title='เข้ากลุ่ม Telegram'
-        className='flex size-11 items-center justify-center rounded-full border border-sky-200 bg-white shadow-lg shadow-slate-900/10 transition hover:-translate-y-0.5 hover:shadow-xl dark:border-slate-700 dark:bg-slate-950'
+    <aside className='fixed right-3 bottom-16 z-40 md:right-5 md:bottom-20'>
+      <div className='hidden w-52 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.16)] md:block dark:border-slate-800 dark:bg-slate-950'>
+        <div className='border-b border-slate-100 px-4 py-3 dark:border-slate-800'>
+          <div className='flex items-center justify-between gap-3'>
+            <div>
+              <p className='text-sm font-bold text-slate-900 dark:text-white'>
+                ต้องการความช่วยเหลือ?
+              </p>
+              <p className='mt-0.5 text-xs text-slate-500 dark:text-slate-400'>
+                ติดต่อทีม TinyAPI
+              </p>
+            </div>
+            <span className='size-2.5 rounded-full bg-emerald-500 ring-4 ring-emerald-100 dark:ring-emerald-500/15' />
+          </div>
+        </div>
+        <div className='p-2'>
+          {floatingContactChannels.map((channel) => {
+            const trigger = (
+              <button
+                type='button'
+                className='group flex h-12 w-full items-center gap-3 rounded-lg px-2 text-left transition hover:bg-slate-50 dark:hover:bg-slate-900'
+              >
+                <img
+                  src={channel.image}
+                  alt=''
+                  className='size-9 rounded-lg object-cover shadow-sm transition group-hover:scale-105'
+                />
+                <span className='min-w-0'>
+                  <span className='block truncate text-sm font-bold text-slate-900 dark:text-white'>
+                    {channel.name}
+                  </span>
+                  <span className='block truncate text-[11px] text-slate-500 dark:text-slate-400'>
+                    {channel.label}
+                  </span>
+                </span>
+                <span
+                  className={`ml-auto size-2 shrink-0 rounded-full ${channel.dotClassName}`}
+                />
+              </button>
+            )
+            if (channel.name === 'Telegram') {
+              return (
+                <TelegramSupportDialog key={channel.name} trigger={trigger} />
+              )
+            }
+            return (
+              <a
+                key={channel.name}
+                href={channel.href}
+                target='_blank'
+                rel='noopener noreferrer'
+                className='group flex h-12 items-center gap-3 rounded-lg px-2 transition hover:bg-slate-50 dark:hover:bg-slate-900'
+              >
+                {trigger.props.children}
+              </a>
+            )
+          })}
+        </div>
+        <Link
+          to='/about'
+          className='flex h-10 items-center justify-center border-t border-slate-100 text-xs font-bold text-indigo-600 transition hover:bg-indigo-50 dark:border-slate-800 dark:text-indigo-300 dark:hover:bg-indigo-500/10'
+        >
+          เปิดศูนย์ช่วยเหลือ
+        </Link>
+      </div>
+
+      <div className='flex flex-col gap-2.5 md:hidden'>
+        {floatingContactChannels.map((channel) => {
+          const trigger = (
+            <button
+              type='button'
+              aria-label={channel.label}
+              title={channel.label}
+              className={`group relative flex size-14 items-center justify-center rounded-2xl border bg-white p-1.5 shadow-lg shadow-slate-900/10 transition duration-300 hover:-translate-y-1 dark:bg-slate-950 ${channel.className}`}
+            >
+              <span
+                className={`absolute top-1.5 right-1.5 size-2.5 rounded-full ring-2 ring-white ${channel.dotClassName} dark:ring-slate-950`}
+              />
+              <img
+                src={channel.image}
+                alt=''
+                className='size-11 rounded-xl object-cover shadow-sm'
+              />
+            </button>
+          )
+          if (channel.name === 'Telegram') {
+            return (
+              <TelegramSupportDialog key={channel.name} trigger={trigger} />
+            )
+          }
+          return (
+            <a
+              key={channel.name}
+              href={channel.href}
+              target='_blank'
+              rel='noopener noreferrer'
+              aria-label={channel.label}
+              title={channel.label}
+              className={`group relative flex size-14 items-center justify-center rounded-2xl border bg-white p-1.5 shadow-lg shadow-slate-900/10 transition duration-300 hover:-translate-y-1 dark:bg-slate-950 ${channel.className}`}
+            >
+              {trigger.props.children}
+            </a>
+          )
+        })}
+      </div>
+    </aside>
+  )
+}
+
+function FloatingLeaderboardButton() {
+  return (
+    <aside className='fixed bottom-16 left-3 z-40 md:bottom-20 md:left-5'>
+      <Link
+        to='/rankings'
+        search={{ view: 'users', period: 'month' }}
+        className='group hidden h-14 w-52 items-center gap-3 overflow-hidden rounded-xl border border-amber-200 bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 px-3 text-white shadow-[0_18px_42px_rgba(245,158,11,0.28)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_22px_52px_rgba(245,158,11,0.34)] md:flex dark:border-amber-300/30'
       >
-        <img
-          src='/contact-assets/telegram-logo.png'
-          alt=''
-          className='size-8 rounded-full object-cover'
-        />
-      </a>
-      <a
-        href={CONTACT_LINE_URL}
-        target='_blank'
-        rel='noopener noreferrer'
-        aria-label='เข้ากลุ่ม LINE'
-        title='เข้ากลุ่ม LINE'
-        className='flex size-11 items-center justify-center rounded-full border border-emerald-200 bg-white shadow-lg shadow-slate-900/10 transition hover:-translate-y-0.5 hover:shadow-xl dark:border-slate-700 dark:bg-slate-950'
+        <span className='relative flex size-10 shrink-0 items-center justify-center rounded-lg bg-white/20 shadow-inner'>
+          <Trophy className='size-5 animate-bounce' />
+          <span className='absolute -top-1 -right-1 size-3 rounded-full bg-emerald-400 ring-2 ring-white' />
+        </span>
+        <span className='min-w-0'>
+          <span className='block text-sm font-extrabold'>อันดับผู้ใช้งาน</span>
+          <span className='block truncate text-[11px] font-semibold text-white/80'>
+            ดู Hall of Fame
+          </span>
+        </span>
+        <ArrowRight className='ml-auto size-4 transition group-hover:translate-x-0.5' />
+      </Link>
+
+      <Link
+        to='/rankings'
+        search={{ view: 'users', period: 'month' }}
+        aria-label='ดูอันดับผู้ใช้งาน'
+        title='ดูอันดับผู้ใช้งาน'
+        className='group relative flex size-14 animate-bounce items-center justify-center rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-400 via-orange-400 to-rose-400 p-1.5 text-white shadow-lg shadow-amber-500/20 transition duration-300 hover:-translate-y-1 md:hidden dark:border-amber-300/30'
       >
-        <img
-          src='/contact-assets/line-logo.png'
-          alt=''
-          className='size-8 rounded-full object-cover'
-        />
-      </a>
+        <span className='absolute top-1.5 right-1.5 size-2.5 rounded-full bg-emerald-400 ring-2 ring-white dark:ring-slate-950' />
+        <Trophy className='size-8 drop-shadow-sm' />
+      </Link>
+    </aside>
+  )
+}
+
+function HomeTrustStrip() {
+  const metricsQuery = useQuery({
+    queryKey: ['home-trust-metrics'],
+    queryFn: getHomeTrustMetrics,
+    staleTime: 60 * 1000,
+    retry: 1,
+  })
+  const metrics = metricsQuery.data
+
+  const items = [
+    {
+      label: 'Service status',
+      value: metricsQuery.isLoading
+        ? 'กำลังตรวจสอบ'
+        : metrics?.online
+          ? 'ระบบพร้อมใช้งาน'
+          : 'กำลังตรวจสอบระบบ',
+      detail:
+        metrics?.monitorCount && metrics.monitorCount > 0
+          ? `${metrics.monitorCount} services monitored`
+          : 'ตรวจสอบแบบเรียลไทม์',
+      Icon: ShieldCheck,
+      color: metrics?.online
+        ? 'text-emerald-600 dark:text-emerald-300'
+        : 'text-amber-600 dark:text-amber-300',
+    },
+    {
+      label: 'AI models',
+      value: metrics?.modelCount ? `${metrics.modelCount}+ โมเดล` : 'หลายโมเดล',
+      detail: 'Claude, GPT และอื่น ๆ',
+      Icon: Layers3,
+      color: 'text-indigo-600 dark:text-indigo-300',
+    },
+    {
+      label: 'API latency',
+      value: metrics?.latencyMs ? `${metrics.latencyMs} ms` : 'กำลังวัด',
+      detail: 'วัดจากการเชื่อมต่อของคุณ',
+      Icon: Zap,
+      color: 'text-amber-600 dark:text-amber-300',
+    },
+    {
+      label: 'Payment',
+      value: 'PromptPay + Bank',
+      detail: 'พร้อมเพย์และโอนธนาคาร',
+      Icon: Landmark,
+      color: 'text-sky-600 dark:text-sky-300',
+    },
+  ]
+
+  return (
+    <div className='mx-auto mt-9 grid max-w-5xl divide-y overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-4 dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-950'>
+      {items.map((item) => (
+        <div
+          key={item.label}
+          className='flex min-w-0 items-center gap-3 px-4 py-3.5'
+        >
+          <span className='flex size-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-900'>
+            <item.Icon className={`size-4 ${item.color}`} />
+          </span>
+          <span className='min-w-0 text-left'>
+            <span className='block truncate text-xs font-semibold text-slate-500 dark:text-slate-400'>
+              {item.label}
+            </span>
+            <span className='block truncate text-sm font-bold text-slate-950 dark:text-white'>
+              {item.value}
+            </span>
+            <span className='block truncate text-[11px] text-slate-400 dark:text-slate-500'>
+              {item.detail}
+            </span>
+          </span>
+        </div>
+      ))}
     </div>
   )
 }
@@ -257,9 +484,18 @@ function EndpointSummaryCard() {
         ))}
       </div>
       <p className='mt-4 text-sm leading-6 text-slate-500 dark:text-slate-400'>
-        ถ้าเครื่องมือรองรับ ให้ใส่แค่ <code className='rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-800 dark:bg-slate-800 dark:text-slate-100'>{API_BASE_URL}</code>{' '}
-        แล้วให้ระบบต่อ path ที่ต้องใช้เอง อย่าเติม <code className='rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-800 dark:bg-slate-800 dark:text-slate-100'>/v1</code>{' '}
-        หรือ <code className='rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-800 dark:bg-slate-800 dark:text-slate-100'>/v1/chat/completions</code>{' '}
+        ถ้าเครื่องมือรองรับ ให้ใส่แค่{' '}
+        <code className='rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-800 dark:bg-slate-800 dark:text-slate-100'>
+          {API_BASE_URL}
+        </code>{' '}
+        แล้วให้ระบบต่อ path ที่ต้องใช้เอง อย่าเติม{' '}
+        <code className='rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-800 dark:bg-slate-800 dark:text-slate-100'>
+          /v1
+        </code>{' '}
+        หรือ{' '}
+        <code className='rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-800 dark:bg-slate-800 dark:text-slate-100'>
+          /v1/chat/completions
+        </code>{' '}
         ลงไปในช่องหลักถ้าเขาไม่ได้ร้องขอ
       </p>
     </div>
@@ -277,7 +513,7 @@ curl ${OPENAI_BASE_URL}/chat/completions \\
   -d '{"model":"claude-opus-4-6","messages":[{"role":"user","content":"hi"}]}'`
 
   return (
-    <div className='mx-auto mt-12 max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.10)] dark:border-slate-800 dark:bg-slate-950'>
+    <div className='mx-auto mt-9 max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.10)] dark:border-slate-800 dark:bg-slate-950'>
       <div className='flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800'>
         <div className='flex items-center gap-2'>
           <span className='size-2.5 rounded-full bg-rose-400' />
@@ -445,14 +681,14 @@ export function Home() {
       navContent={<TinyTokenHeaderActions />}
       headerProps={{ mobileLinks: tinyTokenHeaderMobileLinks }}
       navLinks={[
-        { title: 'Docs', href: '/docs/' },
+        { title: 'Docs', href: DOCS_URL, external: true },
         { title: 'Status', href: '/dashboard/overview' },
       ]}
     >
       <main className='dark:bg-background dark:text-foreground min-h-svh bg-[#fbfbfc] text-slate-950'>
-        <section className='mx-auto max-w-7xl px-4 pt-28 pb-20 md:px-6 md:pt-36'>
-          <div className='grid items-start gap-8 lg:grid-cols-[360px_minmax(0,1fr)_120px]'>
-            <div className='order-2 lg:order-1 lg:-translate-x-16 lg:pt-8 xl:-translate-x-32'>
+        <section className='mx-auto max-w-7xl px-4 pt-24 pb-12 md:px-6 md:pt-28 md:pb-16'>
+          <div className='grid items-start gap-6 lg:grid-cols-[340px_minmax(0,1fr)_100px]'>
+            <div className='order-2 lg:order-1 lg:-translate-x-10 lg:pt-5 xl:-translate-x-24'>
               <EndpointSummaryCard />
             </div>
             <div className='order-1 text-center lg:order-2'>
@@ -460,16 +696,16 @@ export function Home() {
                 <Sparkles className='size-4 text-indigo-500' />
                 เปิดใช้งาน API · รวม Claude และ GPT ใน endpoint เดียว
               </div>
-              <h1 className='mx-auto mt-9 max-w-4xl text-5xl leading-tight font-bold tracking-tight text-slate-950 md:text-7xl dark:text-white'>
+              <h1 className='mx-auto mt-6 max-w-4xl text-4xl leading-tight font-bold tracking-normal text-slate-950 sm:text-5xl md:text-6xl dark:text-white'>
                 เขียนโค้ดเร็วขึ้น
                 <br />
                 ในราคาที่จ่ายไหว
               </h1>
-              <p className='mx-auto mt-7 max-w-2xl text-lg leading-8 text-slate-500 md:text-xl dark:text-slate-400'>
+              <p className='mx-auto mt-5 max-w-2xl text-base leading-7 text-slate-500 md:text-lg md:leading-8 dark:text-slate-400'>
                 เติมยอด สร้าง API Key แล้วเรียกใช้ Claude, GPT และเครื่องมือ
                 coding ยอดนิยมผ่าน Base URL เดียว จ่ายตามการใช้งานจริง
               </p>
-              <div className='mt-9 flex flex-wrap justify-center gap-3'>
+              <div className='mt-7 flex flex-wrap justify-center gap-3'>
                 <Button
                   className='h-12 rounded-xl px-6 shadow-xl shadow-slate-900/10'
                   render={
@@ -482,7 +718,26 @@ export function Home() {
                 <Button
                   variant='outline'
                   className='h-12 rounded-xl px-6'
-                  render={<Link to='/docs/$slug' params={{ slug: 'register' }} />}
+                  render={
+                    <Link
+                      to='/rankings'
+                      search={{ view: 'users', period: 'month' }}
+                    />
+                  }
+                >
+                  <Trophy className='size-4 text-amber-500' />
+                  ดูอันดับผู้ใช้งาน
+                </Button>
+                <Button
+                  variant='outline'
+                  className='h-12 rounded-xl px-6'
+                  render={
+                    <a
+                      href={DOCS_URL}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                    />
+                  }
                 >
                   <BookOpen className='size-4' />
                   อ่านเอกสาร API
@@ -491,6 +746,7 @@ export function Home() {
             </div>
           </div>
 
+          <HomeTrustStrip />
           <TerminalCard />
           <ToolMarquee />
         </section>
@@ -576,7 +832,7 @@ export function Home() {
               icon={Plug}
               title='เชื่อมต่อเครื่องมือ'
               description='นำ Base URL, API Key และ model id ไปใส่ใน Claude Code หรือ Codex CLI'
-              href='/docs/#cli'
+              href={DOCS_URL}
             />
           </div>
         </section>
@@ -623,7 +879,13 @@ export function Home() {
                 <Button
                   variant='outline'
                   className='h-12 w-full rounded-xl'
-                  render={<Link to='/docs/$slug' params={{ slug: 'register' }} />}
+                  render={
+                    <a
+                      href={DOCS_URL}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                    />
+                  }
                 >
                   <BadgeCheck className='size-4' />
                   อ่าน Quick Start
@@ -633,6 +895,7 @@ export function Home() {
           </div>
         </section>
       </main>
+      <FloatingLeaderboardButton />
       <FloatingContactButtons />
       <Footer />
     </PublicLayout>

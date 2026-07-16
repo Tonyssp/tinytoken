@@ -175,6 +175,8 @@ export interface TopupInfo {
   promptpay_id?: string
   /** Receiving bank display name */
   promptpay_bank_name?: string
+  /** Instructions displayed beside the PromptPay QR */
+  promptpay_instructions?: string
   /** Credits granted per THB */
   promptpay_rate?: number
   /** Minimum PromptPay transfer amount in THB */

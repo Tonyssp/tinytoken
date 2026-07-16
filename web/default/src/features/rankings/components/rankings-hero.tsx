@@ -30,6 +30,7 @@ const PERIODS: { id: RankingPeriod; labelKey: string }[] = [
 
 type RankingsHeroProps = {
   period: RankingPeriod
+  periods?: RankingPeriod[]
   onPeriodChange: (period: RankingPeriod) => void
 }
 
@@ -39,6 +40,9 @@ type RankingsHeroProps = {
  */
 export function RankingsHero(props: RankingsHeroProps) {
   const { t } = useTranslation()
+  const visiblePeriods = props.periods
+    ? PERIODS.filter((period) => props.periods?.includes(period.id))
+    : PERIODS
 
   return (
     <section className='space-y-5'>
@@ -46,7 +50,7 @@ export function RankingsHero(props: RankingsHeroProps) {
         <h1 className='text-[clamp(1.75rem,4vw,2.5rem)] leading-[1.15] font-bold tracking-tight'>
           {t('Rankings')}
         </h1>
-        <p className='text-muted-foreground/80 max-w-2xl whitespace-pre-line text-sm'>
+        <p className='text-muted-foreground/80 max-w-2xl text-sm whitespace-pre-line'>
           {t(
             'Discover the most-used models and rising vendors on the platform, updated from real time usage data.'
           )}
@@ -59,7 +63,7 @@ export function RankingsHero(props: RankingsHeroProps) {
         aria-label={t('Period')}
         className='border-border/60 flex items-center border-b'
       >
-        {PERIODS.map((p) => {
+        {visiblePeriods.map((p) => {
           const isActive = props.period === p.id
           return (
             <button

@@ -23,6 +23,7 @@ import { getFreshModuleAccess } from '@/lib/nav-modules'
 import { Rankings } from '@/features/rankings'
 
 const rankingsSearchSchema = z.object({
+  view: z.enum(['models', 'users']).optional().catch(undefined),
   period: z
     .enum(['today', 'week', 'month', 'year', 'all'])
     .optional()

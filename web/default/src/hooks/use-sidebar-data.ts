@@ -29,6 +29,7 @@ import {
   Radio,
   Settings,
   Ticket,
+  Trophy,
   User,
   Users,
   Wallet,
@@ -130,6 +131,11 @@ export function useSidebarData(): SidebarData {
             title: t('Users'),
             url: '/users',
             icon: Users,
+          },
+          {
+            title: t('Leaderboard'),
+            url: '/leaderboard-admin',
+            icon: Trophy,
           },
           {
             title: t('Redemption Codes'),

@@ -30,7 +30,7 @@ const defaultBillingSettings: BillingSettings = {
   QuotaForInviter: 0,
   QuotaForInvitee: 0,
   TopUpLink: '',
-  'general_setting.docs_link': '',
+  'general_setting.docs_link': 'https://docs.tinyapi.org',
   'quota_setting.enable_free_model_pre_consume': true,
   QuotaPerUnit: 500000,
   USDExchangeRate: 7,
@@ -72,6 +72,8 @@ const defaultBillingSettings: BillingSettings = {
   'payment_setting.promptpay_account_name': '',
   'payment_setting.promptpay_id': '',
   'payment_setting.promptpay_bank_name': 'Kasikorn Bank',
+  'payment_setting.promptpay_instructions':
+    'สแกน QR ด้วยแอปธนาคารของคุณ แล้วอัปโหลดสลิปด้านล่าง',
   'payment_setting.promptpay_rate': 3,
   'payment_setting.promptpay_min_topup': 20,
   'payment_setting.promptpay_amount_options': '[50,100,300,500,1000]',

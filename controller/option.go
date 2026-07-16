@@ -331,6 +331,12 @@ func UpdateOption(c *gin.Context) {
 			})
 			return
 		}
+	case "UserLeaderboardEntries":
+		err = validateUserLeaderboardEntries(option.Value.(string))
+		if err != nil {
+			common.ApiErrorMsg(c, err.Error())
+			return
+		}
 	}
 	err = model.UpdateOption(option.Key, option.Value.(string))
 	if err != nil {

@@ -29,6 +29,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog } from '@/components/dialog'
 import { LanguageSwitcher } from '@/components/language-switcher'
+import { NotificationDialog } from '@/components/notification-dialog'
 import { NotificationPopover } from '@/components/notification-popover'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { ThemeSwitch } from '@/components/theme-switch'
@@ -239,13 +240,13 @@ export function PublicHeader(props: PublicHeaderProps) {
             </div>
 
             {navContent && (
-              <div className='order-last hidden w-full min-w-0 items-center md:flex xl:order-none xl:w-auto xl:flex-1'>
+              <div className='hidden min-w-0 items-center xl:flex xl:flex-1'>
                 {navContent}
               </div>
             )}
 
             {/* Desktop nav */}
-            <div className='ml-auto hidden shrink-0 items-center gap-0.5 sm:flex'>
+            <div className='ml-auto hidden shrink-0 items-center gap-0.5 xl:flex'>
               {desktopLinks.map((link, i) => {
                 const isActive = pathname === link.href
                 if (link.external) {
@@ -277,7 +278,7 @@ export function PublicHeader(props: PublicHeaderProps) {
                     className={cn(
                       'inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-center text-[13px] font-medium transition-all duration-200',
                       isPricing
-                        ? 'h-12 rounded-full border border-indigo-200 bg-indigo-600 px-7 py-0 text-base font-bold text-white shadow-lg shadow-indigo-500/25 ring-2 ring-indigo-500/10 hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-indigo-500/35 dark:border-indigo-300/20 dark:bg-indigo-500 dark:shadow-indigo-500/20 dark:ring-indigo-400/15 dark:hover:bg-indigo-400'
+                        ? 'h-12 rounded-full border border-indigo-200 bg-indigo-600 px-7 py-0 text-base font-bold text-white shadow-lg ring-2 shadow-indigo-500/25 ring-indigo-500/10 hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-indigo-500/35 dark:border-indigo-300/20 dark:bg-indigo-500 dark:shadow-indigo-500/20 dark:ring-indigo-400/15 dark:hover:bg-indigo-400'
                         : isActive
                           ? 'text-foreground'
                           : 'text-muted-foreground hover:text-foreground',
@@ -298,16 +299,28 @@ export function PublicHeader(props: PublicHeaderProps) {
               {showLanguageSwitcher && <LanguageSwitcher />}
               {showThemeSwitch && <ThemeSwitch />}
               {showNotifications && (
-                <NotificationPopover
-                  open={notifications.popoverOpen}
-                  onOpenChange={notifications.setPopoverOpen}
-                  unreadCount={notifications.unreadCount}
-                  activeTab={notifications.activeTab}
-                  onTabChange={notifications.setActiveTab}
-                  notice={notifications.notice}
-                  announcements={notifications.announcements}
-                  loading={notifications.loading}
-                />
+                <>
+                  <NotificationPopover
+                    open={notifications.popoverOpen}
+                    onOpenChange={notifications.setPopoverOpen}
+                    unreadCount={notifications.unreadCount}
+                    activeTab={notifications.activeTab}
+                    onTabChange={notifications.setActiveTab}
+                    notice={notifications.notice}
+                    announcements={notifications.announcements}
+                    loading={notifications.loading}
+                  />
+                  <NotificationDialog
+                    open={notifications.dialogOpen}
+                    onOpenChange={notifications.setDialogOpen}
+                    activeTab={notifications.activeTab}
+                    onTabChange={notifications.setActiveTab}
+                    notice={notifications.notice}
+                    announcements={notifications.announcements}
+                    loading={notifications.loading}
+                    onCloseToday={notifications.closeToday}
+                  />
+                </>
               )}
 
               {navContent && (
@@ -346,7 +359,7 @@ export function PublicHeader(props: PublicHeaderProps) {
             </div>
 
             {/* Mobile: compact actions + hamburger */}
-            <div className='flex items-center gap-2 sm:hidden'>
+            <div className='ml-auto flex items-center gap-2 xl:hidden'>
               {showThemeSwitch && <ThemeSwitch />}
               {showAuthButtons && !loading && isAuthenticated && (
                 <ProfileDropdown />
@@ -388,7 +401,7 @@ export function PublicHeader(props: PublicHeaderProps) {
       {/* Mobile full-screen overlay */}
       <div
         className={cn(
-          'bg-background/98 fixed inset-0 z-40 backdrop-blur-2xl transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] sm:pointer-events-none sm:hidden',
+          'bg-background/98 fixed inset-0 z-40 backdrop-blur-2xl transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] xl:pointer-events-none xl:hidden',
           mobileOpen
             ? 'pointer-events-auto opacity-100'
             : 'pointer-events-none opacity-0'

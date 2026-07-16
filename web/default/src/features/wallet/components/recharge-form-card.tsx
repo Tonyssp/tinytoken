@@ -332,9 +332,7 @@ export function RechargeFormCard({
       setSubmittingPromptPay(true)
       const response = await requestPromptPayManualTopup(formData)
       if (isApiSuccess(response)) {
-        toast.success(
-          t('ส่งคำขอเติมเครดิตแล้ว กรุณารอแอดมินตรวจสอบสลิป')
-        )
+        toast.success(t('ส่งคำขอเติมเครดิตแล้ว กรุณารอแอดมินตรวจสอบสลิป'))
         setPromptPaySlipFile(null)
         setPromptPaySlipName('')
         setSelectedPromptPayBank('')
@@ -458,12 +456,10 @@ export function RechargeFormCard({
       action={
         onOpenBilling ? (
           <Button
-            variant='outline'
-            size='sm'
             onClick={onOpenBilling}
-            className='w-full gap-2 sm:w-auto'
+            className='h-11 w-full gap-2 bg-emerald-600 px-5 text-sm font-bold text-white shadow-md shadow-emerald-600/20 hover:bg-emerald-700 hover:shadow-lg sm:w-auto dark:bg-emerald-500 dark:text-slate-950 dark:hover:bg-emerald-400'
           >
-            <Receipt className='h-4 w-4' />
+            <Receipt className='size-5' />
             {t('Order History')}
           </Button>
         ) : null
@@ -617,9 +613,10 @@ export function RechargeFormCard({
                       </div>
                       <div className='border-t pt-3 text-sm'>
                         <p className='text-muted-foreground'>
-                          {t(
-                            'Scan the QR with your bank app, then upload the payment slip below.'
-                          )}
+                          {topupInfo?.promptpay_instructions?.trim() ||
+                            t(
+                              'Scan the QR with your bank app, then upload the payment slip below.'
+                            )}
                         </p>
                       </div>
                     </div>

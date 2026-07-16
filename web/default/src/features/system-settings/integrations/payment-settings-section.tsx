@@ -28,8 +28,10 @@ import {
   Code2,
   Eye,
   FileSpreadsheet,
+  Plus,
   QrCode,
   ShieldAlert,
+  Trash2,
   UploadCloud,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -136,6 +138,7 @@ const paymentSchema = z.object({
   PromptPayAccountName: z.string(),
   PromptPayId: z.string(),
   PromptPayBankName: z.string(),
+  PromptPayInstructions: z.string().max(500),
   PromptPayRate: z.coerce.number().min(0),
   PromptPayMinTopUp: z.coerce.number().min(0),
   PromptPayAmountOptions: z.string().superRefine((value, ctx) => {
@@ -232,6 +235,249 @@ type PaymentBaseFormValues = Omit<
   PaymentFormValues,
   keyof WaffoSettingsValues | keyof WaffoPancakeSettingsValues
 >
+
+type EditableOtherPaymentMethod = {
+  id: string
+  name: string
+  bank_name: string
+  account_name: string
+  account_number: string
+  qr_image_url: string
+  note: string
+  enabled: boolean
+}
+
+function parseOtherPaymentMethods(value: string): EditableOtherPaymentMethod[] {
+  try {
+    const parsed: unknown = JSON.parse(value || '[]')
+    if (!Array.isArray(parsed)) return []
+
+    return parsed
+      .filter(
+        (item): item is Record<string, unknown> =>
+          Boolean(item) && typeof item === 'object'
+      )
+      .map((item, index) => ({
+        id: String(item.id || `payment-${index + 1}`),
+        name: String(item.name || ''),
+        bank_name: String(item.bank_name || ''),
+        account_name: String(item.account_name || ''),
+        account_number: String(item.account_number || ''),
+        qr_image_url: String(item.qr_image_url || ''),
+        note: String(item.note || ''),
+        enabled: item.enabled !== false,
+      }))
+  } catch {
+    return []
+  }
+}
+
+function OtherPaymentMethodsVisualEditor({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (value: string) => void
+}) {
+  const { t } = useTranslation()
+  const methods = React.useMemo(() => parseOtherPaymentMethods(value), [value])
+
+  const commit = React.useCallback(
+    (next: EditableOtherPaymentMethod[]) => {
+      onChange(JSON.stringify(next, null, 2))
+    },
+    [onChange]
+  )
+
+  const addMethod = () => {
+    const nextNumber = methods.length + 1
+    commit([
+      ...methods,
+      {
+        id: `payment-${Date.now()}`,
+        name: `${t('Payment method')} ${nextNumber}`,
+        bank_name: '',
+        account_name: '',
+        account_number: '',
+        qr_image_url: '',
+        note: '',
+        enabled: true,
+      },
+    ])
+  }
+
+  const updateMethod = (
+    index: number,
+    patch: Partial<EditableOtherPaymentMethod>
+  ) => {
+    commit(
+      methods.map((method, methodIndex) =>
+        methodIndex === index ? { ...method, ...patch } : method
+      )
+    )
+  }
+
+  return (
+    <div className='space-y-4'>
+      <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+        <FormDescription className='max-w-3xl'>
+          {t(
+            'Add bank accounts or other payment methods here. Each enabled method becomes a choice on the member wallet page.'
+          )}
+        </FormDescription>
+        <Button
+          type='button'
+          variant='outline'
+          className='w-full shrink-0 gap-2 sm:w-auto'
+          onClick={addMethod}
+        >
+          <Plus className='size-4' />
+          {t('Add payment method')}
+        </Button>
+      </div>
+
+      {methods.length === 0 ? (
+        <button
+          type='button'
+          onClick={addMethod}
+          className='text-muted-foreground hover:border-foreground/30 hover:text-foreground flex min-h-28 w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 text-sm transition-colors'
+        >
+          <Plus className='size-5' />
+          {t('Add your first payment method')}
+        </button>
+      ) : (
+        <div className='grid gap-4 xl:grid-cols-2'>
+          {methods.map((method, index) => (
+            <section
+              key={method.id}
+              className='bg-muted/10 space-y-4 rounded-lg border p-4'
+            >
+              <div className='flex items-center justify-between gap-3'>
+                <div className='min-w-0'>
+                  <p className='truncate font-semibold'>
+                    {method.name || `${t('Payment method')} ${index + 1}`}
+                  </p>
+                  <p className='text-muted-foreground text-xs'>
+                    {t('Payment method')} {index + 1}
+                  </p>
+                </div>
+                <div className='flex shrink-0 items-center gap-2'>
+                  <span className='text-muted-foreground text-xs'>
+                    {t('Enabled')}
+                  </span>
+                  <Switch
+                    checked={method.enabled}
+                    onCheckedChange={(checked) =>
+                      updateMethod(index, { enabled: checked })
+                    }
+                  />
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    size='icon'
+                    className='text-destructive hover:text-destructive size-9'
+                    aria-label={t('Remove payment method')}
+                    title={t('Remove payment method')}
+                    onClick={() =>
+                      commit(
+                        methods.filter((_, itemIndex) => itemIndex !== index)
+                      )
+                    }
+                  >
+                    <Trash2 className='size-4' />
+                  </Button>
+                </div>
+              </div>
+
+              <div className='grid gap-3 sm:grid-cols-2'>
+                <FormItem>
+                  <FormLabel>{t('Payment method name')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      value={method.name}
+                      placeholder='BCEL One'
+                      onChange={(event) =>
+                        updateMethod(index, { name: event.target.value })
+                      }
+                    />
+                  </FormControl>
+                </FormItem>
+                <FormItem>
+                  <FormLabel>{t('Bank name')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      value={method.bank_name}
+                      placeholder='BCEL'
+                      onChange={(event) =>
+                        updateMethod(index, { bank_name: event.target.value })
+                      }
+                    />
+                  </FormControl>
+                </FormItem>
+                <FormItem>
+                  <FormLabel>{t('Account name')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      value={method.account_name}
+                      onChange={(event) =>
+                        updateMethod(index, {
+                          account_name: event.target.value,
+                        })
+                      }
+                    />
+                  </FormControl>
+                </FormItem>
+                <FormItem>
+                  <FormLabel>{t('Account number')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      value={method.account_number}
+                      onChange={(event) =>
+                        updateMethod(index, {
+                          account_number: event.target.value,
+                        })
+                      }
+                    />
+                  </FormControl>
+                </FormItem>
+                <FormItem className='sm:col-span-2'>
+                  <FormLabel>{t('QR image URL')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      type='url'
+                      value={method.qr_image_url}
+                      placeholder='https://example.com/payment-qr.png'
+                      onChange={(event) =>
+                        updateMethod(index, {
+                          qr_image_url: event.target.value,
+                        })
+                      }
+                    />
+                  </FormControl>
+                </FormItem>
+                <FormItem className='sm:col-span-2'>
+                  <FormLabel>{t('Member instructions')}</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      rows={3}
+                      value={method.note}
+                      placeholder={t(
+                        'Transfer the exact amount, then upload the slip below.'
+                      )}
+                      onChange={(event) =>
+                        updateMethod(index, { note: event.target.value })
+                      }
+                    />
+                  </FormControl>
+                </FormItem>
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 const CURRENT_COMPLIANCE_TERMS_VERSION = 'v1'
 
@@ -512,6 +758,7 @@ export function PaymentSettingsSection({
       PromptPayAccountName: values.PromptPayAccountName.trim(),
       PromptPayId: values.PromptPayId.trim(),
       PromptPayBankName: values.PromptPayBankName.trim(),
+      PromptPayInstructions: values.PromptPayInstructions.trim(),
       PromptPayRate: values.PromptPayRate as number,
       PromptPayMinTopUp: values.PromptPayMinTopUp as number,
       PromptPayAmountOptions: values.PromptPayAmountOptions.trim(),
@@ -533,6 +780,7 @@ export function PaymentSettingsSection({
       PromptPayAccountName: initialRef.current.PromptPayAccountName.trim(),
       PromptPayId: initialRef.current.PromptPayId.trim(),
       PromptPayBankName: initialRef.current.PromptPayBankName.trim(),
+      PromptPayInstructions: initialRef.current.PromptPayInstructions.trim(),
       PromptPayRate: initialRef.current.PromptPayRate,
       PromptPayMinTopUp: initialRef.current.PromptPayMinTopUp,
       PromptPayAmountOptions: initialRef.current.PromptPayAmountOptions.trim(),
@@ -574,6 +822,7 @@ export function PaymentSettingsSection({
     addScalar('PromptPayAccountName', 'payment_setting.promptpay_account_name')
     addScalar('PromptPayId', 'payment_setting.promptpay_id')
     addScalar('PromptPayBankName', 'payment_setting.promptpay_bank_name')
+    addScalar('PromptPayInstructions', 'payment_setting.promptpay_instructions')
     addScalar('PromptPayRate', 'payment_setting.promptpay_rate')
     addScalar('PromptPayMinTopUp', 'payment_setting.promptpay_min_topup')
 
@@ -642,8 +891,7 @@ export function PaymentSettingsSection({
         values.OtherPaymentTelegramBotSecret.trim(),
       OtherPaymentTelegramChatId: values.OtherPaymentTelegramChatId.trim(),
       OtherPaymentLineEnabled: values.OtherPaymentLineEnabled as boolean,
-      OtherPaymentLineAccessSecret:
-        values.OtherPaymentLineAccessSecret.trim(),
+      OtherPaymentLineAccessSecret: values.OtherPaymentLineAccessSecret.trim(),
       OtherPaymentLineGroupId: values.OtherPaymentLineGroupId.trim(),
       OtherPaymentConfirmSecret: values.OtherPaymentConfirmSecret.trim(),
     }
@@ -665,7 +913,8 @@ export function PaymentSettingsSection({
       OtherPaymentLineEnabled: initialRef.current.OtherPaymentLineEnabled,
       OtherPaymentLineAccessSecret:
         initialRef.current.OtherPaymentLineAccessSecret.trim(),
-      OtherPaymentLineGroupId: initialRef.current.OtherPaymentLineGroupId.trim(),
+      OtherPaymentLineGroupId:
+        initialRef.current.OtherPaymentLineGroupId.trim(),
       OtherPaymentConfirmSecret:
         initialRef.current.OtherPaymentConfirmSecret.trim(),
     }
@@ -1349,6 +1598,32 @@ export function PaymentSettingsSection({
               />
             </div>
 
+            <FormField
+              control={form.control}
+              name='PromptPayInstructions'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('PromptPay member instructions')}</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      rows={2}
+                      placeholder={t(
+                        'Scan the QR with your bank app, then upload the payment slip below.'
+                      )}
+                      {...field}
+                      onChange={(event) => field.onChange(event.target.value)}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t(
+                      'Shown beside the QR and receiving account details on the member wallet page.'
+                    )}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <div className='grid gap-6 md:grid-cols-3'>
               <FormField
                 control={form.control}
@@ -2028,20 +2303,15 @@ export function PaymentSettingsSection({
               name='OtherPaymentMethods'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t('Laos bank accounts')}</FormLabel>
+                  <FormLabel className='text-base'>
+                    {t('Payment methods')}
+                  </FormLabel>
                   <FormControl>
-                    <Textarea
-                      rows={10}
-                      placeholder='[{"id":"bcel","name":"BCEL","bank_name":"BCEL","account_name":"TinyToken","account_number":"123456789","qr_image_url":"https://example.com/bcel-qr.png","note":"Transfer exact amount and upload slip.","enabled":true}]'
-                      {...field}
-                      onChange={(event) => field.onChange(event.target.value)}
+                    <OtherPaymentMethodsVisualEditor
+                      value={field.value}
+                      onChange={field.onChange}
                     />
                   </FormControl>
-                  <FormDescription>
-                    {t(
-                      'Each enabled item becomes one Laos payment choice on the member page. Put a QR image URL in qr_image_url.'
-                    )}
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

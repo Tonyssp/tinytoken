@@ -23,6 +23,7 @@ import {
   KeyRound,
   LayoutDashboard,
   MessageSquare,
+  Trophy,
   WalletCards,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -50,14 +51,21 @@ const headerActionLinks = [
     icon: WalletCards,
   },
   {
+    title: 'อันดับ',
+    href: '/rankings/?view=users&period=month',
+    icon: Trophy,
+  },
+  {
     title: 'Getting Started',
-    href: '/docs/register',
+    href: 'https://docs.tinyapi.org',
     icon: KeyRound,
+    external: true,
   },
   {
     title: 'API Docs',
-    href: '/docs/cc-switch',
+    href: 'https://docs.tinyapi.org',
     icon: BookOpen,
+    external: true,
   },
 ]
 
@@ -65,9 +73,10 @@ export const tinyTokenHeaderMobileLinks: TopNavLink[] = [
   ...headerActionLinks.map((link) => ({
     title: link.title,
     href: link.href,
+    external: link.external,
   })),
   {
-    title: 'All AI Model',
+    title: 'ดูราคาโมเดล',
     href: '/pricing',
   },
   {
@@ -77,30 +86,52 @@ export const tinyTokenHeaderMobileLinks: TopNavLink[] = [
 ]
 
 export function TinyTokenHeaderActions() {
-  const pathname = useRouterState({ select: (state) => state.location.pathname })
-  const normalize = (href: string) => href.replace(/\/+$/, '') || '/'
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  })
+  const normalize = (href: string) =>
+    href.split('?')[0]?.replace(/\/+$/, '') || '/'
   const currentPath = normalize(pathname)
 
   return (
-    <div className='flex min-w-0 flex-wrap items-center gap-2 xl:flex-nowrap'>
+    <div className='flex min-w-0 flex-wrap items-center gap-1 xl:flex-nowrap'>
       {headerActionLinks.map((link) => {
         const Icon = link.icon
         const normalizedHref = normalize(link.href)
         const active =
-          normalizedHref === '/'
+          link.external
+            ? false
+            : normalizedHref === '/'
             ? currentPath === '/'
             : currentPath === normalizedHref ||
               currentPath.startsWith(`${normalizedHref}/`)
+
+        const className = cn(
+          'inline-flex h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white',
+          active &&
+            'border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200 dark:hover:bg-indigo-500/20'
+        )
+
+        if (link.external) {
+          return (
+            <a
+              key={link.title}
+              href={link.href}
+              target='_blank'
+              rel='noopener noreferrer'
+              className={className}
+            >
+              <Icon className='size-[18px]' />
+              <span>{link.title}</span>
+            </a>
+          )
+        }
 
         return (
           <Link
             key={link.title}
             to={link.href}
-            className={cn(
-              'inline-flex h-12 shrink-0 items-center gap-2.5 rounded-lg px-4 text-[15px] font-semibold text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white',
-              active &&
-                'border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200 dark:hover:bg-indigo-500/20'
-            )}
+            className={className}
           >
             <Icon className='size-[18px]' />
             <span>{link.title}</span>

@@ -11,6 +11,7 @@ type PaymentSetting struct {
 	PromptPayAccountName       string  `json:"promptpay_account_name"`
 	PromptPayId                string  `json:"promptpay_id"`
 	PromptPayBankName          string  `json:"promptpay_bank_name"`
+	PromptPayInstructions      string  `json:"promptpay_instructions"`
 	PromptPayRate              float64 `json:"promptpay_rate"`
 	PromptPayMinTopUp          float64 `json:"promptpay_min_topup"`
 	PromptPayAmountOptions     []int   `json:"promptpay_amount_options"`
@@ -64,6 +65,7 @@ var paymentSetting = PaymentSetting{
 	AmountOptions:              []int{10, 20, 50, 100, 200, 500},
 	AmountDiscount:             map[int]float64{},
 	PromptPayMode:              "manual",
+	PromptPayInstructions:      "สแกน QR ด้วยแอปธนาคารของคุณ แล้วอัปโหลดสลิปด้านล่าง",
 	PromptPayRate:              3,
 	PromptPayMinTopUp:          20,
 	PromptPayAmountOptions:     []int{50, 100, 300, 500, 1000},

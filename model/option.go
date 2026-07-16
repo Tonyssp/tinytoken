@@ -67,6 +67,10 @@ func InitOptionMap() {
 	common.OptionMap["Notice"] = ""
 	common.OptionMap["About"] = ""
 	common.OptionMap["HomePageContent"] = ""
+	common.OptionMap["UserLeaderboardEnabled"] = "false"
+	common.OptionMap["UserLeaderboardEntries"] = "[]"
+	common.OptionMap["RankingsYearPeriodEnabled"] = "true"
+	common.OptionMap["RankingsAllPeriodEnabled"] = "true"
 	common.OptionMap["Footer"] = common.Footer
 	common.OptionMap["SystemName"] = common.SystemName
 	common.OptionMap["Logo"] = common.Logo

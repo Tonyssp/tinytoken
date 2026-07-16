@@ -4636,6 +4636,8 @@
     "Enter PromptPay ID in admin settings to show QR": "Enter PromptPay ID in admin settings to show QR",
     "Copied PromptPay ID": "Copied PromptPay ID",
     "Scan the QR with your bank app, then upload the payment slip below.": "Scan the QR with your bank app, then upload the payment slip below.",
+    "PromptPay member instructions": "PromptPay member instructions",
+    "Shown beside the QR and receiving account details on the member wallet page.": "Shown beside the QR and receiving account details on the member wallet page.",
     "Bank you transferred from": "Bank you transferred from",
     "Select bank": "Select bank",
     "Thai banks": "Thai banks",
@@ -4660,6 +4662,14 @@
     "Enter a friend invite code here to redeem points": "Enter a friend invite code here to redeem points",
     "Connection successful.": "Connection successful.",
     "Connection successful. {{count}} model(s) available.": "Connection successful. {{count}} model(s) available.",
-    "Connection test failed.": "Connection test failed."
+    "Connection test failed.": "Connection test failed.",
+    "Payment method": "Payment method",
+    "Bank name": "Bank name",
+    "QR image URL": "QR image URL",
+    "Member instructions": "Member instructions",
+    "Add bank accounts or other payment methods here. Each enabled method becomes a choice on the member wallet page.": "Add bank accounts or other payment methods here. Each enabled method becomes a choice on the member wallet page.",
+    "Add your first payment method": "Add your first payment method",
+    "Remove payment method": "Remove payment method",
+    "Transfer the exact amount, then upload the slip below.": "Transfer the exact amount, then upload the slip below."
   }
 }

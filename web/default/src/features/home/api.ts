@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
-import type { HomePageContentResponse } from './types'
+import type { HomePageContentResponse, HomeTrustMetrics } from './types'
 
 // ============================================================================
 // Home Page APIs
@@ -30,4 +30,39 @@ import type { HomePageContentResponse } from './types'
 export async function getHomePageContent(): Promise<HomePageContentResponse> {
   const res = await api.get('/api/home_page_content')
   return res.data
+}
+
+export async function getHomeTrustMetrics(): Promise<HomeTrustMetrics> {
+  const startedAt = performance.now()
+  const statusResponse = await api.get('/api/status')
+  const latencyMs = Math.max(1, Math.round(performance.now() - startedAt))
+
+  const [pricingResult, uptimeResult] = await Promise.allSettled([
+    api.get('/api/pricing'),
+    api.get('/api/uptime/status'),
+  ])
+
+  const models =
+    pricingResult.status === 'fulfilled' &&
+    Array.isArray(pricingResult.value.data?.data)
+      ? pricingResult.value.data.data
+      : []
+  const uptimeGroups =
+    uptimeResult.status === 'fulfilled' &&
+    Array.isArray(uptimeResult.value.data?.data)
+      ? uptimeResult.value.data.data
+      : []
+  const monitors = uptimeGroups.flatMap((group) =>
+    Array.isArray(group?.monitors) ? group.monitors : []
+  )
+
+  return {
+    online:
+      statusResponse.status === 200 &&
+      (monitors.length === 0 ||
+        monitors.every((monitor) => monitor.status === 1)),
+    modelCount: models.length,
+    latencyMs,
+    monitorCount: monitors.length,
+  }
 }

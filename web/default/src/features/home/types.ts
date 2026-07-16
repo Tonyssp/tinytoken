@@ -37,3 +37,10 @@ export interface HomePageContentResult {
   isLoaded: boolean
   isUrl: boolean
 }
+
+export interface HomeTrustMetrics {
+  online: boolean
+  modelCount: number
+  latencyMs: number
+  monitorCount: number
+}

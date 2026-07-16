@@ -39,6 +39,7 @@ func SetApiRouter(router *gin.Engine) {
 			perfMetricsRoute.GET("", controller.GetPerfMetrics)
 		}
 		apiRouter.GET("/rankings", middleware.HeaderNavModuleAuth("rankings"), controller.GetRankings)
+		apiRouter.GET("/user/leaderboard", controller.GetPublicUserLeaderboard)
 		apiRouter.GET("/verification", middleware.EmailVerificationRateLimit(), middleware.TurnstileCheck(), controller.SendEmailVerification)
 		apiRouter.GET("/reset_password", middleware.CriticalRateLimit(), middleware.TurnstileCheck(), controller.SendPasswordResetEmail)
 		apiRouter.POST("/user/reset", middleware.CriticalRateLimit(), anonymousRequestBodyLimit, controller.ResetPassword)
@@ -133,6 +134,7 @@ func SetApiRouter(router *gin.Engine) {
 				adminRoute.GET("/topup", controller.GetAllTopUps)
 				adminRoute.POST("/topup/complete", controller.AdminCompleteTopUp)
 				adminRoute.GET("/search", controller.SearchUsers)
+				adminRoute.GET("/leaderboard/candidates", controller.GetUserLeaderboardCandidates)
 				adminRoute.GET("/:id/oauth/bindings", controller.GetUserOAuthBindingsByAdmin)
 				adminRoute.DELETE("/:id/oauth/bindings/:provider_id", controller.UnbindCustomOAuthByAdmin)
 				adminRoute.DELETE("/:id/bindings/:binding_type", controller.AdminClearUserBinding)

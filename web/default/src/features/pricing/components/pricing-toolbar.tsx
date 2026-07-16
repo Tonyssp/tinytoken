@@ -164,9 +164,9 @@ export function PricingToolbar(props: PricingToolbarProps) {
   )
 
   return (
-    <div className='rounded-xl border p-3'>
+    <div className='min-w-0 overflow-hidden rounded-xl border p-3'>
       <div className='flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between'>
-        <div className='flex items-center gap-2'>
+        <div className='flex min-w-0 items-center justify-between gap-2 lg:justify-start'>
           <Button
             type='button'
             variant='outline'
@@ -183,7 +183,7 @@ export function PricingToolbar(props: PricingToolbarProps) {
             )}
           </Button>
 
-          <div className='text-muted-foreground flex items-baseline gap-1 text-sm'>
+          <div className='text-muted-foreground flex min-w-0 items-baseline gap-1 text-sm'>
             <span className='text-foreground font-semibold tabular-nums'>
               {props.filteredCount.toLocaleString()}
             </span>
@@ -196,7 +196,7 @@ export function PricingToolbar(props: PricingToolbarProps) {
           </div>
         </div>
 
-        <div className='flex flex-wrap items-center gap-2'>
+        <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:flex sm:flex-wrap'>
           <div className='hidden items-center gap-2 sm:flex'>
             <SegmentedControl
               options={[
@@ -225,12 +225,14 @@ export function PricingToolbar(props: PricingToolbarProps) {
                   type='button'
                   variant='outline'
                   size='sm'
-                  className='h-8 gap-1.5 px-3 text-xs'
+                  className='h-8 min-w-0 justify-start gap-1.5 px-3 text-xs sm:justify-center'
                 />
               }
             >
               <ArrowUpDown className='size-3.5' />
-              <span>{sortLabels[props.sortBy as SortOption] || t('Sort')}</span>
+              <span className='truncate'>
+                {sortLabels[props.sortBy as SortOption] || t('Sort')}
+              </span>
             </DropdownMenuTrigger>
             <DropdownMenuContent align='end' className='w-44'>
               {Object.entries(sortLabels).map(([value, label]) => (

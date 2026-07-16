@@ -8,6 +8,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/controller"
 	"github.com/QuantumNous/new-api/middleware"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
@@ -29,6 +30,8 @@ func SetWebRouter(router *gin.Engine, assets ThemeAssets) {
 	router.Use(gzip.Gzip(gzip.DefaultCompression))
 	router.Use(middleware.GlobalWebRateLimit())
 	router.Use(middleware.Cache())
+	router.Any("/docs", redirectDocs)
+	router.Any("/docs/*path", redirectDocs)
 	router.Use(static.Serve("/", themeFS))
 	router.NoRoute(func(c *gin.Context) {
 		c.Set(middleware.RouteTagKey, "web")
@@ -43,4 +46,12 @@ func SetWebRouter(router *gin.Engine, assets ThemeAssets) {
 			c.Data(http.StatusOK, "text/html; charset=utf-8", assets.DefaultIndexPage)
 		}
 	})
+}
+
+func redirectDocs(c *gin.Context) {
+	docsLink := strings.TrimSuffix(operation_setting.GetGeneralSetting().DocsLink, "/")
+	if docsLink == "" {
+		docsLink = "https://docs.tinyapi.org"
+	}
+	c.Redirect(http.StatusMovedPermanently, docsLink)
 }

@@ -17,9 +17,19 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute, redirect } from '@tanstack/react-router'
+import { useAuthStore } from '@/stores/auth-store'
+import { ROLE } from '@/lib/roles'
+import { LeaderboardAdmin } from '@/features/leaderboard-admin'
 
-export const Route = createFileRoute('/docs/$slug')({
+export const Route = createFileRoute('/_authenticated/leaderboard-admin/')({
   beforeLoad: () => {
-    throw redirect({ href: 'https://docs.tinyapi.org' })
+    const { auth } = useAuthStore.getState()
+
+    if (!auth.user || auth.user.role < ROLE.ADMIN) {
+      throw redirect({
+        to: '/403',
+      })
+    }
   },
+  component: LeaderboardAdmin,
 })

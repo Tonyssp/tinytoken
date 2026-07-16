@@ -30,10 +30,14 @@ import { useTranslation } from 'react-i18next'
 import { Markdown } from '@/components/ui/markdown'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PublicLayout } from '@/components/layout'
+import {
+  TELEGRAM_SUPPORT_URL,
+  TelegramSupportDialog,
+} from '@/components/telegram-support-dialog'
 import { getAboutContent } from './api'
 
 const contactLinks = {
-  telegram: 'https://t.me/+9_DdYIuFAQlkYTk9',
+  telegram: TELEGRAM_SUPPORT_URL,
   facebook: 'https://www.facebook.com/share/18odMfCxkk/?mibextid=wwXIfr',
   line: 'https://line.me/ti/g/N3pcMe9CAc',
 }
@@ -45,7 +49,10 @@ const contactChannels = [
     description: 'เหมาะสำหรับติดตามข่าว อัปเดต และคุยกับทีมงานแบบรวดเร็ว',
     href: contactLinks.telegram,
     image: '/contact-assets/telegram-logo.png',
-    accent: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-500/10 dark:text-sky-200 dark:border-sky-500/30',
+    accent:
+      'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-500/10 dark:text-sky-200 dark:border-sky-500/30',
+    card: 'hover:border-sky-300 hover:shadow-[0_18px_45px_rgba(14,165,233,0.18)] dark:hover:border-sky-500/50',
+    action: 'bg-sky-500 text-white hover:bg-sky-600',
   },
   {
     name: 'Facebook',
@@ -53,7 +60,10 @@ const contactChannels = [
     description: 'ช่องทางสำหรับประกาศทั่วไป โปรโมชัน และข้อความจากเพจ',
     href: contactLinks.facebook,
     image: '/contact-assets/facebook-logo.png',
-    accent: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-200 dark:border-blue-500/30',
+    accent:
+      'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-200 dark:border-blue-500/30',
+    card: 'hover:border-blue-300 hover:shadow-[0_18px_45px_rgba(37,99,235,0.18)] dark:hover:border-blue-500/50',
+    action: 'bg-blue-600 text-white hover:bg-blue-700',
   },
   {
     name: 'LINE',
@@ -61,7 +71,10 @@ const contactChannels = [
     description: 'ช่องทางหลักสำหรับติดต่อ สอบถาม และรับความช่วยเหลือ',
     href: contactLinks.line,
     image: '/contact-assets/line-logo.png',
-    accent: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:border-emerald-500/30',
+    accent:
+      'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:border-emerald-500/30',
+    card: 'hover:border-emerald-300 hover:shadow-[0_18px_45px_rgba(16,185,129,0.18)] dark:hover:border-emerald-500/50',
+    action: 'bg-emerald-500 text-white hover:bg-emerald-600',
   },
 ]
 
@@ -99,27 +112,48 @@ function EmptyAboutState() {
               ติดต่อทีมงาน TinyAPI
             </h1>
             <p className='mt-5 max-w-2xl text-base leading-8 text-slate-600 md:text-lg dark:text-slate-300'>
-              เลือกช่องทางที่สะดวกเพื่อสอบถามเรื่อง API Key, การเติมเครดิต, ราคาโมเดล
-              หรือการตั้งค่าเครื่องมือ AI ให้เชื่อมต่อกับ TinyAPI
+              เลือกช่องทางที่สะดวกเพื่อสอบถามเรื่อง API Key, การเติมเครดิต,
+              ราคาโมเดล หรือการตั้งค่าเครื่องมือ AI ให้เชื่อมต่อกับ TinyAPI
             </p>
             <div className='mt-8 flex flex-wrap gap-3'>
-              {contactChannels.map((channel) => (
-                <a
-                  key={channel.name}
-                  href={channel.href}
-                  target='_blank'
-                  rel='noopener noreferrer'
-                  className='inline-flex items-center gap-3 rounded-lg border bg-white px-4 py-3 text-sm font-bold shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-900'
-                >
-                  <img
-                    src={channel.image}
-                    alt={channel.name}
-                    className='size-8 rounded-md object-cover'
-                  />
-                  {channel.name}
-                  <ExternalLink className='size-4 text-slate-400' />
-                </a>
-              ))}
+              {contactChannels.map((channel) => {
+                const trigger = (
+                  <button
+                    type='button'
+                    className={`inline-flex min-h-16 items-center gap-3 rounded-xl border bg-white px-4 py-3 text-sm font-bold shadow-sm transition duration-300 hover:-translate-y-1 dark:bg-slate-900 ${channel.card}`}
+                  >
+                    <span className='relative'>
+                      <img
+                        src={channel.image}
+                        alt={channel.name}
+                        className='size-10 rounded-xl object-cover shadow-sm'
+                      />
+                      <span className='absolute -top-1 -right-1 size-3 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900' />
+                    </span>
+                    <span>{channel.name}</span>
+                    <ExternalLink className='size-4 text-slate-400' />
+                  </button>
+                )
+                if (channel.name === 'Telegram') {
+                  return (
+                    <TelegramSupportDialog
+                      key={channel.name}
+                      trigger={trigger}
+                    />
+                  )
+                }
+                return (
+                  <a
+                    key={channel.name}
+                    href={channel.href}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    className={`inline-flex min-h-16 items-center gap-3 rounded-xl border bg-white px-4 py-3 text-sm font-bold shadow-sm transition duration-300 hover:-translate-y-1 dark:bg-slate-900 ${channel.card}`}
+                  >
+                    {trigger.props.children}
+                  </a>
+                )
+              })}
             </div>
           </div>
 
@@ -150,34 +184,56 @@ function EmptyAboutState() {
       </section>
 
       <section className='mx-auto grid max-w-6xl gap-6 px-4 py-10 md:px-6 lg:grid-cols-3'>
-        {contactChannels.map((channel) => (
-          <a
-            key={channel.name}
-            href={channel.href}
-            target='_blank'
-            rel='noopener noreferrer'
-            className='group rounded-xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900'
-          >
-            <div className='flex items-start justify-between gap-4'>
-              <img
-                src={channel.image}
-                alt={channel.name}
-                className='size-14 rounded-xl object-cover shadow-sm'
-              />
-              <span className={`rounded-full border px-3 py-1 text-xs font-bold ${channel.accent}`}>
-                เปิดลิงก์
-              </span>
-            </div>
-            <h2 className='mt-5 text-xl font-bold'>{channel.label}</h2>
-            <p className='mt-3 min-h-14 text-sm leading-7 text-slate-600 dark:text-slate-300'>
-              {channel.description}
-            </p>
-            <div className='mt-5 inline-flex items-center gap-2 text-sm font-bold text-blue-700 group-hover:underline dark:text-blue-300'>
-              ไปที่ {channel.name}
-              <ExternalLink className='size-4' />
-            </div>
-          </a>
-        ))}
+        {contactChannels.map((channel) => {
+          const trigger = (
+            <button
+              type='button'
+              className={`group w-full rounded-xl border bg-white p-6 text-left shadow-sm transition duration-300 hover:-translate-y-1.5 dark:bg-slate-900 ${channel.card}`}
+            >
+              <div className='flex items-start justify-between gap-4'>
+                <span className='relative'>
+                  <img
+                    src={channel.image}
+                    alt={channel.name}
+                    className='size-16 rounded-2xl object-cover shadow-md transition duration-300 group-hover:scale-105'
+                  />
+                  <span className='absolute -top-1 -right-1 size-4 rounded-full bg-emerald-500 ring-[3px] ring-white dark:ring-slate-900' />
+                </span>
+                <span
+                  className={`rounded-full border px-3 py-1 text-xs font-bold ${channel.accent}`}
+                >
+                  ออนไลน์
+                </span>
+              </div>
+              <h2 className='mt-5 text-xl font-bold'>{channel.label}</h2>
+              <p className='mt-3 min-h-14 text-sm leading-7 text-slate-600 dark:text-slate-300'>
+                {channel.description}
+              </p>
+              <div
+                className={`mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold shadow-sm transition ${channel.action}`}
+              >
+                ไปที่ {channel.name}
+                <ExternalLink className='size-4' />
+              </div>
+            </button>
+          )
+          if (channel.name === 'Telegram') {
+            return (
+              <TelegramSupportDialog key={channel.name} trigger={trigger} />
+            )
+          }
+          return (
+            <a
+              key={channel.name}
+              href={channel.href}
+              target='_blank'
+              rel='noopener noreferrer'
+              className={`group rounded-xl border bg-white p-6 shadow-sm transition duration-300 hover:-translate-y-1.5 dark:bg-slate-900 ${channel.card}`}
+            >
+              {trigger.props.children}
+            </a>
+          )
+        })}
       </section>
 
       <section className='mx-auto grid max-w-6xl gap-6 px-4 pb-14 md:px-6 lg:grid-cols-[minmax(0,1fr)_360px]'>
@@ -190,7 +246,7 @@ function EmptyAboutState() {
             {supportItems.map((item) => (
               <div
                 key={item}
-                className='rounded-lg border bg-white p-4 text-sm font-medium leading-7 text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300'
+                className='rounded-lg border bg-white p-4 text-sm leading-7 font-medium text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300'
               >
                 {item}
               </div>
@@ -205,7 +261,8 @@ function EmptyAboutState() {
               <h3 className='font-bold'>เวลาตอบกลับ</h3>
             </div>
             <p className='mt-3 text-sm leading-7 text-slate-600 dark:text-slate-300'>
-              ปกติทีมงานจะตอบกลับในช่องทางโซเชียลเร็วที่สุด โดยเฉพาะ LINE และ Telegram
+              ปกติทีมงานจะตอบกลับในช่องทางโซเชียลเร็วที่สุด โดยเฉพาะ LINE และ
+              Telegram
             </p>
           </div>
 

@@ -69,6 +69,8 @@ export type SiteSettings = {
   'legal.privacy_policy': string
   HeaderNavModules: string
   SidebarModulesAdmin: string
+  UserLeaderboardEnabled: boolean
+  UserLeaderboardEntries: string
 }
 
 export type AuthSettings = {
@@ -232,6 +234,7 @@ export type BillingSettings = {
   'payment_setting.promptpay_account_name': string
   'payment_setting.promptpay_id': string
   'payment_setting.promptpay_bank_name': string
+  'payment_setting.promptpay_instructions': string
   'payment_setting.promptpay_rate': number
   'payment_setting.promptpay_min_topup': number
   'payment_setting.promptpay_amount_options': string

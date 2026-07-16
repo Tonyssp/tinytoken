@@ -162,6 +162,8 @@ const BILLING_SECTIONS = [
             settings['payment_setting.promptpay_account_name'],
           PromptPayId: settings['payment_setting.promptpay_id'],
           PromptPayBankName: settings['payment_setting.promptpay_bank_name'],
+          PromptPayInstructions:
+            settings['payment_setting.promptpay_instructions'],
           PromptPayRate: settings['payment_setting.promptpay_rate'],
           PromptPayMinTopUp: settings['payment_setting.promptpay_min_topup'],
           PromptPayAmountOptions:

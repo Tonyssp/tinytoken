@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
+import { useStatus } from '@/hooks/use-status'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PublicLayout } from '@/components/layout'
 import { PageTransition } from '@/components/page-transition'
@@ -26,6 +27,7 @@ import {
   ModelsSection,
   PulseSection,
   RankingsHero,
+  UserLeaderboardSection,
 } from './components'
 import { useRankings } from './hooks/use-rankings'
 import type { RankingPeriod } from './types'
@@ -36,12 +38,21 @@ export function Rankings() {
   const { t } = useTranslation()
   const search = useSearch({ from: '/rankings/' })
   const navigate = useNavigate()
+  const { status } = useStatus()
+  const visiblePeriods = VALID_PERIODS.filter((period) => {
+    if (period === 'year') return status?.rankings_year_period_enabled !== false
+    if (period === 'all') return status?.rankings_all_period_enabled !== false
+    return true
+  })
 
   const period: RankingPeriod = VALID_PERIODS.includes(
     search.period as RankingPeriod
   )
-    ? (search.period as RankingPeriod)
+    ? visiblePeriods.includes(search.period as RankingPeriod)
+      ? (search.period as RankingPeriod)
+      : 'month'
     : 'week'
+  const view = search.view === 'users' ? 'users' : 'models'
 
   const rankingsQuery = useRankings(period)
   const snapshot = rankingsQuery.data?.data
@@ -50,6 +61,13 @@ export function Rankings() {
     navigate({
       to: '/rankings',
       search: (prev) => ({ ...prev, period: next }),
+    })
+  }
+
+  const handleViewChange = (next: 'models' | 'users') => {
+    navigate({
+      to: '/rankings',
+      search: (prev) => ({ ...prev, view: next }),
     })
   }
 
@@ -72,9 +90,37 @@ export function Rankings() {
           }}
         />
         <PageTransition className='relative mx-auto w-full max-w-[1280px] space-y-8 px-3 pt-16 pb-10 sm:px-6 sm:pt-20 sm:pb-12 xl:px-8'>
-          <RankingsHero period={period} onPeriodChange={handlePeriodChange} />
+          <RankingsHero
+            period={period}
+            periods={visiblePeriods}
+            onPeriodChange={handlePeriodChange}
+          />
 
-          {rankingsQuery.isLoading ? (
+          <div className='bg-card grid grid-cols-2 rounded-lg border p-1 sm:w-fit sm:min-w-80'>
+            {(
+              [
+                ['users', 'User Leaderboard'],
+                ['models', 'Model Rankings'],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type='button'
+                onClick={() => handleViewChange(value)}
+                className={`h-10 rounded-md px-4 text-sm font-semibold transition ${
+                  view === value
+                    ? 'bg-foreground text-background shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {view === 'users' ? (
+            <UserLeaderboardSection period={period} />
+          ) : rankingsQuery.isLoading ? (
             <RankingsLoading />
           ) : !snapshot ? (
             <RankingsError

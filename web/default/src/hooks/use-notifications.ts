@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useState, useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNotificationStore } from '@/stores/notification-store'
 import { getNotice } from '@/lib/api'
@@ -42,10 +42,6 @@ function hashString(input: string): string {
 function getAnnouncementKey(item: Record<string, unknown>): string {
   if (!item) return ''
 
-  if (item.id !== undefined && item.id !== null) {
-    return `id:${item.id}`
-  }
-
   const fingerprint = JSON.stringify({
     publishDate: (item?.publishDate as string) || '',
     content: ((item?.content as string) || '').trim(),
@@ -54,7 +50,13 @@ function getAnnouncementKey(item: Record<string, unknown>): string {
     title: ((item?.title as string) || '').trim(),
     link: ((item?.link as string) || '').trim(),
   })
-  return `hash:${hashString(fingerprint)}`
+  const contentHash = hashString(fingerprint)
+
+  if (item.id !== undefined && item.id !== null) {
+    return `id:${item.id}:${contentHash}`
+  }
+
+  return `hash:${contentHash}`
 }
 
 /**
@@ -63,9 +65,11 @@ function getAnnouncementKey(item: Record<string, unknown>): string {
  */
 export function useNotifications() {
   const [popoverOpen, setPopoverOpen] = useState(false)
+  const [dialogOpen, setDialogOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<'notice' | 'announcements'>(
     'notice'
   )
+  const autoPopupHandled = useRef(false)
 
   // Fetch Notice from API
   const {
@@ -92,6 +96,8 @@ export function useNotifications() {
     markNoticeRead,
     markAnnouncementsRead,
     isAnnouncementRead,
+    setClosedUntilDate,
+    isNoticeClosed,
   } = useNotificationStore()
 
   // Extract notice content
@@ -127,6 +133,35 @@ export function useNotifications() {
     }
   }
 
+  const markAllAsRead = () => {
+    if (noticeContent) {
+      markNoticeRead(noticeContent)
+    }
+    markAnnouncementsAsRead()
+  }
+
+  useEffect(() => {
+    if (
+      autoPopupHandled.current ||
+      noticeLoading ||
+      statusLoading ||
+      unreadCounts.total === 0 ||
+      isNoticeClosed()
+    ) {
+      return
+    }
+
+    autoPopupHandled.current = true
+    setActiveTab(unreadCounts.announcements > 0 ? 'announcements' : 'notice')
+    setDialogOpen(true)
+  }, [
+    isNoticeClosed,
+    noticeLoading,
+    statusLoading,
+    unreadCounts.announcements,
+    unreadCounts.total,
+  ])
+
   // Handle popover open
   const handleOpenPopover = (tab?: 'notice' | 'announcements') => {
     const nextTab = tab || activeTab
@@ -152,6 +187,18 @@ export function useNotifications() {
     setPopoverOpen(false)
   }
 
+  const handleDialogOpenChange = (open: boolean) => {
+    if (!open) {
+      markAllAsRead()
+    }
+    setDialogOpen(open)
+  }
+
+  const handleCloseToday = () => {
+    setClosedUntilDate(new Date().toDateString())
+    setDialogOpen(false)
+  }
+
   // Handle tab change - mark announcements as read when switching to that tab
   const handleTabChange = (tab: 'notice' | 'announcements') => {
     setActiveTab(tab)
@@ -175,12 +222,15 @@ export function useNotifications() {
     // Popover state
     popoverOpen,
     setPopoverOpen: handlePopoverOpenChange,
+    dialogOpen,
+    setDialogOpen: handleDialogOpenChange,
     activeTab,
     setActiveTab: handleTabChange,
 
     // Actions
     openPopover: handleOpenPopover,
     closePopover: () => setPopoverOpen(false),
+    closeToday: handleCloseToday,
     refetchNotice,
   }
 }

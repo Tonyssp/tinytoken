@@ -107,6 +107,10 @@ func GetStatus(c *gin.Context) {
 		"HeaderNavModules":    common.OptionMap["HeaderNavModules"],
 		"SidebarModulesAdmin": common.OptionMap["SidebarModulesAdmin"],
 
+		// Public rankings controls. Missing legacy values default to enabled.
+		"rankings_year_period_enabled": common.OptionMap["RankingsYearPeriodEnabled"] != "false",
+		"rankings_all_period_enabled":  common.OptionMap["RankingsAllPeriodEnabled"] != "false",
+
 		"oidc_enabled":                system_setting.GetOIDCSettings().Enabled,
 		"oidc_client_id":              system_setting.GetOIDCSettings().ClientId,
 		"oidc_authorization_endpoint": system_setting.GetOIDCSettings().AuthorizationEndpoint,

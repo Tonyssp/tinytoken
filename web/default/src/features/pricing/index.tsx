@@ -156,7 +156,7 @@ export function Pricing() {
 
   return (
     <PublicLayout showMainContainer={false}>
-      <div className='relative'>
+      <div className='relative overflow-x-hidden'>
         <div
           aria-hidden
           className='pointer-events-none absolute inset-x-0 top-0 h-[600px] opacity-20 dark:opacity-[0.10]'
@@ -174,7 +174,7 @@ export function Pricing() {
         />
         <PageTransition className='relative mx-auto w-full max-w-[1800px] px-3 pt-16 pb-8 sm:px-6 sm:pt-20 sm:pb-10 xl:px-8'>
           <header className='mx-auto mb-5 max-w-3xl pt-5 text-center sm:mb-10 sm:pt-10'>
-            <h1 className='text-[clamp(2rem,5.5vw,3.5rem)] leading-[1.15] font-bold tracking-tight'>
+            <h1 className='text-3xl leading-tight font-bold tracking-normal sm:text-5xl'>
               {t('Model Square')}
             </h1>
             <p className='text-muted-foreground/80 mt-3 text-sm sm:mt-4 sm:text-base'>

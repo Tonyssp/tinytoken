@@ -24,6 +24,25 @@ For commercial licensing, please contact support@quantumnous.com
 
 export type RankingPeriod = 'today' | 'week' | 'month' | 'year' | 'all'
 
+export type UserLeaderboardEntry = {
+  rank: number
+  type?: 'real' | 'fake'
+  display_name: string
+  request_count: number
+  used_quota: number
+  prompt_tokens: number
+  completion_tokens: number
+  cache_write_tokens?: number
+  cache_read_tokens?: number
+  top_model: string
+}
+
+export type UserLeaderboardSnapshot = {
+  enabled: boolean
+  period: RankingPeriod
+  users: UserLeaderboardEntry[]
+}
+
 export type RankingCategoryId =
   | 'all'
   | 'programming'
