@@ -10,7 +10,7 @@
 
 ในหน้า CC-Switch ให้เลือกไอคอน Claude Desktop จากนั้นกดปุ่ม + เพื่อเพิ่ม Provider ใหม่
 
-![รูปประกอบคู่มือ](../assets/docs-assets/ccswitch-docx/claude-desktop-01.png)
+![รูปประกอบคู่มือ](../.gitbook/assets/claude-desktop-01.png)
 
 เลือก Claude Desktop แล้วกด +
 
@@ -18,7 +18,7 @@
 
 เปิดหน้า API Keys ใน TinyToken แล้วกดปุ่มคัดลอก API Key
 
-![รูปประกอบคู่มือ](../assets/docs-assets/ccswitch-docx/claude-desktop-02.png)
+![รูปประกอบคู่มือ](../.gitbook/assets/claude-desktop-02.png)
 
 คัดลอก API Key จาก TinyToken
 
@@ -32,7 +32,7 @@ API Key: วาง API Key ที่คัดลอกมา
 
 API Endpoint / Base URL: https://api.tinyapi.org แล้วกด Save
 
-![รูปประกอบคู่มือ](../assets/docs-assets/ccswitch-docx/claude-desktop-03.png)
+![รูปประกอบคู่มือ](../.gitbook/assets/claude-desktop-03.png)
 
 กรอก API Key และ Endpoint
 
@@ -40,7 +40,7 @@ API Endpoint / Base URL: https://api.tinyapi.org แล้วกด Save
 
 กด Fetch Models เพื่อให้ CC-Switch ดึงรายชื่อโมเดลจาก TinyToken
 
-![รูปประกอบคู่มือ](../assets/docs-assets/ccswitch-docx/claude-desktop-04.png)
+![รูปประกอบคู่มือ](../.gitbook/assets/claude-desktop-04.png)
 
 กด Fetch Models
 
@@ -48,7 +48,7 @@ API Endpoint / Base URL: https://api.tinyapi.org แล้วกด Save
 
 เลือกโมเดล เช่น claude-opus-4-6, claude-opus-4-7 หรือ claude-sonnet รุ่นที่ต้องการ แล้วกด Save
 
-![รูปประกอบคู่มือ](../assets/docs-assets/ccswitch-docx/claude-desktop-05.png)
+![รูปประกอบคู่มือ](../.gitbook/assets/claude-desktop-05.png)
 
 เลือกโมเดลและกด Save
 
@@ -56,7 +56,7 @@ API Endpoint / Base URL: https://api.tinyapi.org แล้วกด Save
 
 ไปที่ Settings > Routing แล้วเปิด Show Routing Toggle on Main Page, Routing Master Switch และเปิด Claude
 
-![รูปประกอบคู่มือ](../assets/docs-assets/ccswitch-docx/claude-desktop-06.png)
+![รูปประกอบคู่มือ](../.gitbook/assets/claude-desktop-06.png)
 
 เปิด Routing Master Switch และ Claude
 
@@ -64,7 +64,7 @@ API Endpoint / Base URL: https://api.tinyapi.org แล้วกด Save
 
 ใน Claude Desktop ให้เปิดเมนูด้านซ้ายล่าง แล้วเลือก Inference configuration
 
-![รูปประกอบคู่มือ](../assets/docs-assets/ccswitch-docx/claude-desktop-07.png)
+![รูปประกอบคู่มือ](../.gitbook/assets/claude-desktop-07.png)
 
 เปิด Inference configuration
 
@@ -72,7 +72,7 @@ API Endpoint / Base URL: https://api.tinyapi.org แล้วกด Save
 
 ใน Connection ให้เลือก Gateway ใส่ https://api.tinyapi.org และ API Key จากนั้นกด Test connection และ Test model discovery
 
-![รูปประกอบคู่มือ](../assets/docs-assets/ccswitch-docx/claude-desktop-08.png)
+![รูปประกอบคู่มือ](../.gitbook/assets/claude-desktop-08.png)
 
 ตั้งค่า Gateway และทดสอบการเชื่อมต่อ
 
@@ -84,7 +84,7 @@ API Endpoint / Base URL: https://api.tinyapi.org แล้วกด Save
 
 ไปที่ Inference configuration > Connection แล้วเลือก Anthropic API จากนั้นกด Apply Changes และเปิด Claude Desktop ใหม่
 
-![รูปประกอบคู่มือ](../assets/docs-assets/ccswitch-docx/claude-desktop-09.png)
+![รูปประกอบคู่มือ](../.gitbook/assets/claude-desktop-09.png)
 
 เลือก Anthropic API เพื่อกลับไปใช้ Claude Desktop แบบเดิม
 
