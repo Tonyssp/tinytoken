@@ -125,6 +125,7 @@ func GetTopUpInfo(c *gin.Context) {
 		"promptpay_mode":                   paymentSetting.PromptPayMode,
 		"promptpay_account_name":           paymentSetting.PromptPayAccountName,
 		"promptpay_id":                     paymentSetting.PromptPayId,
+		"promptpay_qr_id":                  paymentSetting.PromptPayQrId,
 		"promptpay_bank_name":              paymentSetting.PromptPayBankName,
 		"promptpay_instructions":           paymentSetting.PromptPayInstructions,
 		"promptpay_rate":                   paymentSetting.PromptPayRate,

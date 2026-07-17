@@ -137,6 +137,7 @@ const paymentSchema = z.object({
   PromptPayMode: z.enum(['manual', 'automatic', 'both']),
   PromptPayAccountName: z.string(),
   PromptPayId: z.string(),
+  PromptPayQrId: z.string(),
   PromptPayBankName: z.string(),
   PromptPayInstructions: z.string().max(500),
   PromptPayRate: z.coerce.number().min(0),
@@ -954,6 +955,7 @@ export function PaymentSettingsSection({
       PromptPayMode: values.PromptPayMode,
       PromptPayAccountName: values.PromptPayAccountName.trim(),
       PromptPayId: values.PromptPayId.trim(),
+      PromptPayQrId: values.PromptPayQrId.trim(),
       PromptPayBankName: values.PromptPayBankName.trim(),
       PromptPayInstructions: values.PromptPayInstructions.trim(),
       PromptPayRate: values.PromptPayRate as number,
@@ -976,6 +978,7 @@ export function PaymentSettingsSection({
       PromptPayMode: initialRef.current.PromptPayMode,
       PromptPayAccountName: initialRef.current.PromptPayAccountName.trim(),
       PromptPayId: initialRef.current.PromptPayId.trim(),
+      PromptPayQrId: initialRef.current.PromptPayQrId.trim(),
       PromptPayBankName: initialRef.current.PromptPayBankName.trim(),
       PromptPayInstructions: initialRef.current.PromptPayInstructions.trim(),
       PromptPayRate: initialRef.current.PromptPayRate,
@@ -1018,6 +1021,7 @@ export function PaymentSettingsSection({
     addScalar('PromptPayMode', 'payment_setting.promptpay_mode')
     addScalar('PromptPayAccountName', 'payment_setting.promptpay_account_name')
     addScalar('PromptPayId', 'payment_setting.promptpay_id')
+    addScalar('PromptPayQrId', 'payment_setting.promptpay_qr_id')
     addScalar('PromptPayBankName', 'payment_setting.promptpay_bank_name')
     addScalar('PromptPayInstructions', 'payment_setting.promptpay_instructions')
     addScalar('PromptPayRate', 'payment_setting.promptpay_rate')
@@ -1822,7 +1826,7 @@ export function PaymentSettingsSection({
               )}
             />
 
-            <div className='grid gap-6 md:grid-cols-3'>
+            <div className='grid gap-6 md:grid-cols-2 xl:grid-cols-4'>
               <FormField
                 control={form.control}
                 name='PromptPayAccountName'
@@ -1849,16 +1853,39 @@ export function PaymentSettingsSection({
                 name='PromptPayId'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('PromptPay ID')}</FormLabel>
+                    <FormLabel>
+                      {t('Display account / PromptPay number')}
+                    </FormLabel>
                     <FormControl>
                       <Input
-                        placeholder={t('Phone, national ID, or tax ID')}
+                        placeholder='6352200784'
                         {...field}
                         onChange={(event) => field.onChange(event.target.value)}
                       />
                     </FormControl>
                     <FormDescription>
-                      {t('Used to generate the member QR code later')}
+                      {t('Shown to members beside the copy button')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='PromptPayQrId'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('PromptPay QR ID')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder='0844155451'
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('Used only to generate the QR code')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

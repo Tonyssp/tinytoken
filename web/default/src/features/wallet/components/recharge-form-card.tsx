@@ -279,7 +279,10 @@ export function RechargeFormCard({
   const promptPayCredits = topupAmount * promptPayRate
   const promptPayMode = topupInfo?.promptpay_mode || 'manual'
   const promptPayProvider = topupInfo?.promptpay_slip_provider || 'manual'
-  const promptPayQrPayload = createPromptPayPayload(promptPayId, topupAmount)
+  const promptPayQrId =
+    topupInfo?.promptpay_qr_id?.trim() ||
+    (normalizePromptPayTarget(promptPayId) ? promptPayId : DEFAULT_PROMPTPAY_ID)
+  const promptPayQrPayload = createPromptPayPayload(promptPayQrId, topupAmount)
   const legacyTopupEnabled =
     topupInfo?.enable_online_topup ||
     topupInfo?.enable_stripe_topup ||

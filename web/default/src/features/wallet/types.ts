@@ -177,6 +177,8 @@ export interface TopupInfo {
   promptpay_account_name?: string
   /** PromptPay phone, national ID, or tax ID */
   promptpay_id?: string
+  /** PromptPay phone, national ID, or tax ID used only for QR generation */
+  promptpay_qr_id?: string
   /** Receiving bank display name */
   promptpay_bank_name?: string
   /** Instructions displayed beside the PromptPay QR */
