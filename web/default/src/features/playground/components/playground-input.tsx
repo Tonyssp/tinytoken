@@ -67,12 +67,12 @@ interface PlaygroundInputProps {
 }
 
 const suggestions = [
-  { icon: BarChartIcon, text: 'Analyze data', color: '#76d0eb' },
-  { icon: BoxIcon, text: 'Surprise me', color: '#76d0eb' },
-  { icon: NotepadTextIcon, text: 'Summarize text', color: '#ea8444' },
-  { icon: CodeSquareIcon, text: 'Code', color: '#6c71ff' },
-  { icon: GraduationCapIcon, text: 'Get advice', color: '#76d0eb' },
-  { icon: null, text: 'More' },
+  { icon: BarChartIcon, text: 'วิเคราะห์ข้อมูล', color: '#0ea5e9' },
+  { icon: BoxIcon, text: 'ลองถามตัวอย่าง', color: '#8b5cf6' },
+  { icon: NotepadTextIcon, text: 'สรุปข้อความ', color: '#f97316' },
+  { icon: CodeSquareIcon, text: 'เขียนโค้ด', color: '#6366f1' },
+  { icon: GraduationCapIcon, text: 'ขอคำแนะนำ', color: '#14b8a6' },
+  { icon: null, text: 'เพิ่มเติม' },
 ]
 
 export function PlaygroundInput({
@@ -223,7 +223,7 @@ export function PlaygroundInput({
         {suggestions.map(({ icon: Icon, text, color }) => (
           <Suggestion
             className={`text-xs font-normal sm:text-sm ${
-              text === 'More' ? 'hidden sm:flex' : ''
+              text === 'เพิ่มเติม' ? 'hidden sm:flex' : ''
             }`}
             key={text}
             onClick={() => handleSuggestionClick(text)}

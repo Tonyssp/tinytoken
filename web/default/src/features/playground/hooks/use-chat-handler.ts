@@ -26,6 +26,7 @@ import {
   updateLastAssistantMessage,
   processStreamingContent,
   finalizeMessage,
+  buildSafeErrorMessage,
 } from '../lib'
 import type { Message, PlaygroundConfig, ParameterEnabled } from '../types'
 import { useStreamRequest } from './use-stream-request'
@@ -92,7 +93,7 @@ export function useChatHandler({
   // Handle stream error
   const handleStreamError = useCallback(
     (error: string, errorCode?: string) => {
-      toast.error(error)
+      toast.error(buildSafeErrorMessage(error, errorCode))
       onMessageUpdate((prev) =>
         updateAssistantMessageWithError(prev, error, errorCode)
       )

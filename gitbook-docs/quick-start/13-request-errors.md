@@ -119,6 +119,36 @@ TinyAPI ไม่มี endpoint `/v1/me` หรือ
 const delay = (ms) =>
   new Promise((resolve) => setTimeout(resolve, ms))
 
-for (let attempt = 0; attempt
-            ห้ามส่ง API Key แบบเต็มให้บุคคลอื่น หากจำเป็นให้แสดงเฉพาะต้นและท้าย เช่น
-            `sk-abcd...wxyz`
+for (let attempt = 0; attempt < 5; attempt += 1) {
+  const res = await fetch('https://api.tinyapi.org/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer sk-...',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: 'hello' }],
+    }),
+  })
+
+  if (res.status !== 429) {
+    break
+  }
+
+  await delay(1000 * 2 ** attempt)
+}
+```
+
+## ส่งข้อมูลให้ Admin ตรวจสอบ
+
+ถ้าปัญหายังเกิดซ้ำ ให้ส่งข้อมูลเหล่านี้ให้ Admin:
+
+- HTTP status code
+- error code หรือ type
+- Request ID ถ้ามี
+- endpoint ที่เรียก
+- ชื่อโมเดล
+- เวลาโดยประมาณที่เกิดปัญหา
+
+ห้ามส่ง API Key แบบเต็มให้บุคคลอื่น หากจำเป็นให้แสดงเฉพาะต้นและท้าย เช่น `sk-abcd...wxyz`

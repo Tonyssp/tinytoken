@@ -25,6 +25,33 @@ import type {
   ContentPart,
 } from '../types'
 
+const REQUEST_ID_PATTERN =
+  /\(?\s*request(?:_ori)?_?id\s*[:：]\s*[a-zA-Z0-9-]+\s*\)?/gi
+const CJK_PATTERN = /[\u3400-\u9fff\uf900-\ufaff]/
+
+const ERROR_HINTS: Array<[RegExp, string]> = [
+  [
+    /(insufficient_user_quota|quota|credit|balance|403)/i,
+    'เครดิตหรือสิทธิ์การใช้งานไม่เพียงพอ กรุณาเติมเครดิตหรือเลือกโมเดลอื่น',
+  ],
+  [
+    /(unauthorized|invalid.*key|401)/i,
+    'API Key ไม่ถูกต้องหรือหมดอายุ กรุณาตรวจสอบ API Key แล้วลองใหม่',
+  ],
+  [
+    /(rate.?limit|too many requests|429)/i,
+    'ส่งคำขอบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่',
+  ],
+  [
+    /(model_not_found|model.*not.*found|503)/i,
+    'โมเดลนี้ยังไม่พร้อมใช้งาน กรุณาเลือกโมเดลอื่นแล้วลองใหม่',
+  ],
+  [
+    /(invalid_request|bad request|400|json|parameter)/i,
+    'คำขอไม่ถูกต้อง กรุณาตรวจสอบโมเดล ข้อความ และการตั้งค่าก่อนลองใหม่',
+  ],
+]
+
 /**
  * Create a new message version
  */
@@ -224,7 +251,7 @@ export function updateAssistantMessageWithError(
   return updateLastAssistantMessage(messages, (message) => {
     const updatedMessage = updateCurrentVersionContent(
       message,
-      `${ERROR_MESSAGES.API_REQUEST_ERROR}: ${errorMessage}`
+      buildSafeErrorMessage(errorMessage, errorCode)
     )
     return {
       ...updatedMessage,
@@ -233,6 +260,32 @@ export function updateAssistantMessageWithError(
       errorCode: errorCode || null,
     }
   })
+}
+
+/**
+ * Hide raw upstream messages from customers.
+ * Some providers return Chinese text, request IDs, and internal routing details.
+ */
+export function buildSafeErrorMessage(
+  errorMessage?: string,
+  errorCode?: string
+): string {
+  const raw = `${errorCode ? `${errorCode} ` : ''}${errorMessage ?? ''}`
+    .replace(REQUEST_ID_PATTERN, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  for (const [pattern, message] of ERROR_HINTS) {
+    if (pattern.test(raw)) {
+      return `${ERROR_MESSAGES.API_REQUEST_ERROR}: ${message}`
+    }
+  }
+
+  if (!raw || CJK_PATTERN.test(raw) || raw.length > 180) {
+    return `${ERROR_MESSAGES.API_REQUEST_ERROR}: กรุณาลองใหม่หรือเปลี่ยนโมเดล หากยังเกิดซ้ำให้แจ้งแอดมินตรวจสอบ`
+  }
+
+  return `${ERROR_MESSAGES.API_REQUEST_ERROR}: ${raw}`
 }
 
 /**

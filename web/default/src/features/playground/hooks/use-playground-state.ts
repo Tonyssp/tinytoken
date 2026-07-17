@@ -23,7 +23,6 @@ import {
   saveConfig,
   loadParameterEnabled,
   saveParameterEnabled,
-  loadMessages,
   saveMessages,
 } from '../lib'
 import type {
@@ -51,9 +50,7 @@ export function usePlaygroundState() {
     }
   )
 
-  const [messages, setMessages] = useState<Message[]>(() => {
-    return loadMessages() || []
-  })
+  const [messages, setMessages] = useState<Message[]>([])
 
   const [models, setModels] = useState<ModelOption[]>([])
   const [groups, setGroups] = useState<GroupOption[]>([])
@@ -88,7 +85,6 @@ export function usePlaygroundState() {
       setMessages((prev) => {
         const newMessages =
           typeof updater === 'function' ? updater(prev) : updater
-        saveMessages(newMessages)
         return newMessages
       })
     },
@@ -97,8 +93,9 @@ export function usePlaygroundState() {
 
   // Clear all messages
   const clearMessages = useCallback(() => {
-    updateMessages([])
-  }, [updateMessages])
+    setMessages([])
+    saveMessages([])
+  }, [])
 
   // Reset config to defaults
   const resetConfig = useCallback(() => {

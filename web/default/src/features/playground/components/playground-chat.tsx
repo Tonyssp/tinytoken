@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useEffect, useMemo, useState } from 'react'
+import { Bot, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -103,7 +104,38 @@ export function PlaygroundChat({
     <Conversation>
       {/* Remove outer padding; apply padding to inner centered container to align with input */}
       <ConversationContent className='p-0'>
-        <div className='mx-auto w-full max-w-4xl px-4 py-4'>
+        <div className='mx-auto flex min-h-full w-full max-w-4xl flex-col px-4 py-4'>
+          {messages.length === 0 && (
+            <div className='flex flex-1 flex-col items-center justify-center gap-5 py-16 text-center'>
+              <div className='flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-100 to-fuchsia-100 text-sky-600 shadow-sm'>
+                <Bot className='size-7' />
+              </div>
+              <div className='space-y-2'>
+                <h1 className='bg-gradient-to-r from-violet-600 via-fuchsia-500 to-orange-500 bg-clip-text text-3xl font-bold text-transparent md:text-4xl'>
+                  ถามอะไรกับ TinyAPI ก็ได้
+                </h1>
+                <p className='mx-auto max-w-xl text-sm text-muted-foreground md:text-base'>
+                  เลือกโมเดล เลือกกลุ่ม แล้วเริ่มทดสอบคำตอบจาก API ได้ทันที
+                </p>
+              </div>
+              <div className='grid w-full max-w-2xl gap-2 sm:grid-cols-2'>
+                {[
+                  'ช่วยสรุปข้อความนี้ให้สั้นลง',
+                  'เขียนตัวอย่างเรียก API ด้วย JavaScript',
+                  'แปลข้อความนี้เป็นภาษาไทยแบบเป็นธรรมชาติ',
+                  'ช่วยตรวจ prompt นี้ให้ตอบดีขึ้น',
+                ].map((item) => (
+                  <div
+                    className='flex items-center gap-2 rounded-xl border bg-background px-4 py-3 text-left text-sm text-muted-foreground shadow-sm'
+                    key={item}
+                  >
+                    <Sparkles className='size-4 shrink-0 text-violet-500' />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {messages.map((message, messageIndex) => {
             const { versions = [] } = message
             const isLastAssistantMessage =

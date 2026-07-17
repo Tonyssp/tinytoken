@@ -20,6 +20,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { MessageSquareText, Plus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { getUserModels, getUserGroups } from './api'
 import { PlaygroundChat } from './components/playground-chat'
 import { PlaygroundInput } from './components/playground-input'
@@ -39,6 +41,7 @@ export function Playground() {
     setModels,
     setGroups,
     updateConfig,
+    clearMessages,
   } = usePlaygroundState()
 
   const { sendChat, stopGeneration, isGenerating } = useChatHandler({
@@ -54,7 +57,7 @@ export function Playground() {
 
   // Load models
   const { data: modelsData, isLoading: isLoadingModels } = useQuery({
-    queryKey: ['playground-models'],
+    queryKey: ['playground-models', t],
     queryFn: async () => {
       try {
         return await getUserModels()
@@ -71,7 +74,7 @@ export function Playground() {
 
   // Load groups
   const { data: groupsData } = useQuery({
-    queryKey: ['playground-groups'],
+    queryKey: ['playground-groups', t],
     queryFn: async () => {
       try {
         return await getUserGroups()
@@ -188,39 +191,79 @@ export function Playground() {
     updateMessages(newMessages)
   }
 
-  return (
-    <div className='relative flex size-full flex-col overflow-hidden'>
-      {/* Full-width scroll container: scrolling works even over side whitespace */}
-      <div className='flex flex-1 flex-col overflow-hidden'>
-        <PlaygroundChat
-          messages={messages}
-          onCopyMessage={handleCopyMessage}
-          onRegenerateMessage={handleRegenerateMessage}
-          onEditMessage={handleEditMessage}
-          onDeleteMessage={handleDeleteMessage}
-          isGenerating={isGenerating}
-          editingKey={editingMessageKey}
-          onCancelEdit={handleEditOpenChange}
-          onSaveEdit={(newContent) => applyEdit(newContent, false)}
-          onSaveEditAndSubmit={(newContent) => applyEdit(newContent, true)}
-        />
-      </div>
+  const handleNewChat = () => {
+    if (isGenerating) {
+      stopGeneration()
+    }
+    setEditingMessageKey(null)
+    clearMessages()
+  }
 
-      {/* Input area: center content and constrain to the same container width */}
-      <div className='mx-auto w-full max-w-4xl'>
-        <PlaygroundInput
-          disabled={isGenerating}
-          groups={groups}
-          groupValue={config.group}
-          isGenerating={isGenerating}
-          isModelLoading={isLoadingModels}
-          modelValue={config.model}
-          models={models}
-          onGroupChange={(value) => updateConfig('group', value)}
-          onModelChange={(value) => updateConfig('model', value)}
-          onStop={stopGeneration}
-          onSubmit={handleSendMessage}
-        />
+  return (
+    <div className='relative flex size-full overflow-hidden bg-background'>
+      <aside className='hidden w-72 shrink-0 flex-col border-r bg-background/95 md:flex'>
+        <div className='flex h-16 items-center justify-between border-b px-5'>
+          <div className='text-base font-semibold'>บทสนทนา</div>
+          <Button
+            className='gap-1.5 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-4 text-white shadow-sm hover:from-violet-600 hover:to-fuchsia-600'
+            onClick={handleNewChat}
+            size='sm'
+          >
+            <Plus className='size-4' />
+            ใหม่
+          </Button>
+        </div>
+        <div className='flex flex-1 flex-col items-center justify-center gap-2 px-5 text-center text-sm text-muted-foreground'>
+          <MessageSquareText className='size-5 opacity-50' />
+          <p>ยังไม่มีบทสนทนา</p>
+        </div>
+        <div className='border-t px-5 py-4 text-xs text-muted-foreground'>
+          <div className='flex items-center justify-between'>
+            <span>เครดิตคงเหลือ</span>
+            <span className='font-semibold text-emerald-600'>พร้อมใช้งาน</span>
+          </div>
+        </div>
+      </aside>
+
+      <div className='flex min-w-0 flex-1 flex-col overflow-hidden'>
+        <div className='flex h-14 items-center justify-between border-b px-4 md:hidden'>
+          <div className='font-semibold'>บทสนทนา</div>
+          <Button className='gap-1.5 rounded-full' onClick={handleNewChat}>
+            <Plus className='size-4' />
+            ใหม่
+          </Button>
+        </div>
+
+        <div className='flex flex-1 flex-col overflow-hidden'>
+          <PlaygroundChat
+            messages={messages}
+            onCopyMessage={handleCopyMessage}
+            onRegenerateMessage={handleRegenerateMessage}
+            onEditMessage={handleEditMessage}
+            onDeleteMessage={handleDeleteMessage}
+            isGenerating={isGenerating}
+            editingKey={editingMessageKey}
+            onCancelEdit={handleEditOpenChange}
+            onSaveEdit={(newContent) => applyEdit(newContent, false)}
+            onSaveEditAndSubmit={(newContent) => applyEdit(newContent, true)}
+          />
+        </div>
+
+        <div className='mx-auto w-full max-w-4xl px-4 md:px-0'>
+          <PlaygroundInput
+            disabled={isGenerating}
+            groups={groups}
+            groupValue={config.group}
+            isGenerating={isGenerating}
+            isModelLoading={isLoadingModels}
+            modelValue={config.model}
+            models={models}
+            onGroupChange={(value) => updateConfig('group', value)}
+            onModelChange={(value) => updateConfig('model', value)}
+            onStop={stopGeneration}
+            onSubmit={handleSendMessage}
+          />
+        </div>
       </div>
     </div>
   )
