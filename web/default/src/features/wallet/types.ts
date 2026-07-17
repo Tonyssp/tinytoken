@@ -76,6 +76,7 @@ export interface OtherPaymentMethod {
   rate?: number
   min_topup?: number
   amount_options?: number[]
+
   enabled?: boolean
 }
 

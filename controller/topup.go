@@ -108,12 +108,7 @@ func GetTopUpInfo(c *gin.Context) {
 	paymentSetting := operation_setting.GetPaymentSetting()
 	enablePromptPay := complianceConfirmed && paymentSetting.PromptPayEnabled
 	enableOtherPayment := complianceConfirmed && paymentSetting.OtherPaymentEnabled
-	otherPaymentMethods := make([]operation_setting.OtherPaymentMethod, 0, len(paymentSetting.OtherPaymentMethods))
-	for _, method := range paymentSetting.OtherPaymentMethods {
-		if method.Enabled {
-			otherPaymentMethods = append(otherPaymentMethods, method)
-		}
-	}
+	otherPaymentMethods := buildPublicOtherPaymentMethods(paymentSetting)
 
 	data := gin.H{
 		"enable_online_topup":              isEpayTopUpEnabled(),
@@ -170,6 +165,45 @@ type AmountRequest struct {
 	Amount int64 `json:"amount"`
 }
 
+type publicOtherPaymentMethod struct {
+	Id            string  `json:"id"`
+	Name          string  `json:"name"`
+	BankName      string  `json:"bank_name"`
+	AccountName   string  `json:"account_name"`
+	AccountNumber string  `json:"account_number"`
+	QRImageURL    string  `json:"qr_image_url"`
+	Note          string  `json:"note"`
+	Currency      string  `json:"currency,omitempty"`
+	Rate          float64 `json:"rate,omitempty"`
+	MinTopUp      float64 `json:"min_topup,omitempty"`
+	AmountOptions []int   `json:"amount_options,omitempty"`
+	Enabled       bool    `json:"enabled"`
+}
+
+func buildPublicOtherPaymentMethods(setting *operation_setting.PaymentSetting) []publicOtherPaymentMethod {
+	methods := make([]publicOtherPaymentMethod, 0, len(setting.OtherPaymentMethods))
+	for _, method := range setting.OtherPaymentMethods {
+		if !method.Enabled {
+			continue
+		}
+		methods = append(methods, publicOtherPaymentMethod{
+			Id:            method.Id,
+			Name:          method.Name,
+			BankName:      method.BankName,
+			AccountName:   method.AccountName,
+			AccountNumber: method.AccountNumber,
+			QRImageURL:    method.QRImageURL,
+			Note:          method.Note,
+			Currency:      method.Currency,
+			Rate:          method.Rate,
+			MinTopUp:      method.MinTopUp,
+			AmountOptions: method.AmountOptions,
+			Enabled:       method.Enabled,
+		})
+	}
+	return methods
+}
+
 type otherPaymentTelegramUpdate struct {
 	UpdateID int64 `json:"update_id"`
 	Message  *struct {
@@ -194,8 +228,11 @@ func otherPaymentApprovalKey(chatID int64, messageID int) string {
 	return fmt.Sprintf("%d:%d", chatID, messageID)
 }
 
-func telegramTopupWebhookSecret(botToken string) string {
-	configured := strings.TrimSpace(operation_setting.GetPaymentSetting().OtherPaymentConfirmSecret)
+func telegramTopupWebhookSecret(botToken string, configuredSecret string) string {
+	configured := strings.TrimSpace(configuredSecret)
+	if configured == "" {
+		configured = strings.TrimSpace(operation_setting.GetPaymentSetting().OtherPaymentConfirmSecret)
+	}
 	if configured != "" {
 		return configured
 	}
@@ -203,7 +240,7 @@ func telegramTopupWebhookSecret(botToken string) string {
 	return fmt.Sprintf("%x", sum[:16])
 }
 
-func ensureTelegramTopupWebhook(botToken string) error {
+func ensureTelegramTopupWebhook(botToken string, configuredSecret string) error {
 	serverAddress := strings.TrimRight(strings.TrimSpace(system_setting.ServerAddress), "/")
 	if botToken == "" {
 		return errors.New("Telegram bot token is empty")
@@ -215,7 +252,7 @@ func ensureTelegramTopupWebhook(botToken string) error {
 	webhookURL := fmt.Sprintf(
 		"%s/api/payment/other/telegram/webhook?secret=%s",
 		serverAddress,
-		url.QueryEscape(telegramTopupWebhookSecret(botToken)),
+		url.QueryEscape(telegramTopupWebhookSecret(botToken, configuredSecret)),
 	)
 	form := url.Values{
 		"url":             {webhookURL},
@@ -250,13 +287,16 @@ func ensureTelegramTopupWebhook(botToken string) error {
 	return nil
 }
 
-func telegramApprovalBot(chatID int64) (string, bool) {
+type telegramTopupBotConfig struct {
+	enabled bool
+	token   string
+	chatID  string
+	secret  string
+}
+
+func telegramApprovalBot(chatID int64) (string, string, bool) {
 	paymentSetting := operation_setting.GetPaymentSetting()
-	configs := []struct {
-		enabled bool
-		token   string
-		chatID  string
-	}{
+	configs := []telegramTopupBotConfig{
 		{
 			enabled: paymentSetting.PromptPayTelegramEnabled,
 			token:   paymentSetting.PromptPayTelegramBotSecret,
@@ -266,15 +306,24 @@ func telegramApprovalBot(chatID int64) (string, bool) {
 			enabled: paymentSetting.OtherPaymentTelegramEnabled,
 			token:   paymentSetting.OtherPaymentTelegramBotSecret,
 			chatID:  paymentSetting.OtherPaymentTelegramChatId,
+			secret:  paymentSetting.OtherPaymentConfirmSecret,
 		},
+	}
+	for _, method := range paymentSetting.OtherPaymentMethods {
+		configs = append(configs, telegramTopupBotConfig{
+			enabled: method.TelegramEnabled,
+			token:   method.TelegramBotToken,
+			chatID:  method.TelegramChatId,
+			secret:  method.ConfirmSecret,
+		})
 	}
 	for _, config := range configs {
 		configuredChatID, err := strconv.ParseInt(strings.TrimSpace(config.chatID), 10, 64)
 		if err == nil && config.enabled && config.token != "" && configuredChatID == chatID {
-			return config.token, true
+			return config.token, config.secret, true
 		}
 	}
-	return "", false
+	return "", "", false
 }
 
 func isTelegramGroupAdmin(botToken string, chatID int64, userID int64) (bool, error) {
@@ -377,12 +426,12 @@ func saveTopupSlip(tradeNo string, header *multipart.FileHeader) (string, []byte
 	return path, data, nil
 }
 
-func notifyTelegramManualTopup(enabled bool, botToken string, chatID string, tradeNo string, text string, slipName string, slipBytes []byte) {
+func notifyTelegramManualTopup(enabled bool, botToken string, chatID string, webhookSecret string, tradeNo string, text string, slipName string, slipBytes []byte) {
 	if !enabled || botToken == "" || chatID == "" {
 		return
 	}
 
-	if err := ensureTelegramTopupWebhook(botToken); err != nil {
+	if err := ensureTelegramTopupWebhook(botToken, webhookSecret); err != nil {
 		common.SysLog("failed to configure Telegram topup webhook: " + err.Error())
 	}
 
@@ -438,16 +487,18 @@ func notifyTelegramManualTopup(enabled bool, botToken string, chatID string, tra
 	}
 }
 
-func notifyTelegramOtherPayment(setting *operation_setting.PaymentSetting, tradeNo string, text string, slipName string, slipBytes []byte) {
-	notifyTelegramManualTopup(
-		setting.OtherPaymentTelegramEnabled,
-		setting.OtherPaymentTelegramBotSecret,
-		setting.OtherPaymentTelegramChatId,
-		tradeNo,
-		text,
-		slipName,
-		slipBytes,
-	)
+func notifyTelegramOtherPayment(setting *operation_setting.PaymentSetting, method operation_setting.OtherPaymentMethod, tradeNo string, text string, slipName string, slipBytes []byte) {
+	enabled := method.TelegramEnabled
+	botToken := strings.TrimSpace(method.TelegramBotToken)
+	chatID := strings.TrimSpace(method.TelegramChatId)
+	secret := strings.TrimSpace(method.ConfirmSecret)
+	if botToken == "" || chatID == "" {
+		enabled = setting.OtherPaymentTelegramEnabled
+		botToken = strings.TrimSpace(setting.OtherPaymentTelegramBotSecret)
+		chatID = strings.TrimSpace(setting.OtherPaymentTelegramChatId)
+		secret = strings.TrimSpace(setting.OtherPaymentConfirmSecret)
+	}
+	notifyTelegramManualTopup(enabled, botToken, chatID, secret, tradeNo, text, slipName, slipBytes)
 }
 
 func notifyTelegramPromptPay(setting *operation_setting.PaymentSetting, tradeNo string, text string, slipName string, slipBytes []byte) {
@@ -455,6 +506,7 @@ func notifyTelegramPromptPay(setting *operation_setting.PaymentSetting, tradeNo 
 		setting.PromptPayTelegramEnabled,
 		setting.PromptPayTelegramBotSecret,
 		setting.PromptPayTelegramChatId,
+		setting.OtherPaymentConfirmSecret,
 		tradeNo,
 		text,
 		slipName,
@@ -462,13 +514,37 @@ func notifyTelegramPromptPay(setting *operation_setting.PaymentSetting, tradeNo 
 	)
 }
 
-func notifyLineOtherPayment(setting *operation_setting.PaymentSetting, text string) {
-	if !setting.OtherPaymentLineEnabled || setting.OtherPaymentLineAccessSecret == "" || setting.OtherPaymentLineGroupId == "" {
+func isOtherPaymentConfirmSecretValid(setting *operation_setting.PaymentSetting, provided string) bool {
+	provided = strings.TrimSpace(provided)
+	if provided == "" {
+		return false
+	}
+	if strings.TrimSpace(setting.OtherPaymentConfirmSecret) == provided {
+		return true
+	}
+	for _, method := range setting.OtherPaymentMethods {
+		if strings.TrimSpace(method.ConfirmSecret) == provided {
+			return true
+		}
+	}
+	return false
+}
+
+func notifyLineOtherPayment(setting *operation_setting.PaymentSetting, method operation_setting.OtherPaymentMethod, text string) {
+	enabled := method.LineEnabled
+	accessToken := strings.TrimSpace(method.LineAccessToken)
+	groupID := strings.TrimSpace(method.LineGroupId)
+	if accessToken == "" || groupID == "" {
+		enabled = setting.OtherPaymentLineEnabled
+		accessToken = strings.TrimSpace(setting.OtherPaymentLineAccessSecret)
+		groupID = strings.TrimSpace(setting.OtherPaymentLineGroupId)
+	}
+	if !enabled || accessToken == "" || groupID == "" {
 		return
 	}
 
 	payload := map[string]any{
-		"to": setting.OtherPaymentLineGroupId,
+		"to": groupID,
 		"messages": []map[string]string{
 			{
 				"type": "text",
@@ -483,7 +559,7 @@ func notifyLineOtherPayment(setting *operation_setting.PaymentSetting, text stri
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+setting.OtherPaymentLineAccessSecret)
+	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := service.GetHttpClient().Do(req)
 	if err != nil {
@@ -774,8 +850,8 @@ func RequestOtherPaymentTopUp(c *gin.Context) {
 	}
 
 	message := buildOtherPaymentNotification(tradeNo, userID, amount, creditAmount, method, bankFrom, currency)
-	go notifyTelegramOtherPayment(paymentSetting, tradeNo, message, slip.Filename, slipBytes)
-	go notifyLineOtherPayment(paymentSetting, message)
+	go notifyTelegramOtherPayment(paymentSetting, method, tradeNo, message, slip.Filename, slipBytes)
+	go notifyLineOtherPayment(paymentSetting, method, message)
 
 	common.ApiSuccess(c, gin.H{
 		"trade_no": tradeNo,
@@ -790,8 +866,8 @@ func OtherPaymentTelegramWebhook(c *gin.Context) {
 		return
 	}
 
-	botToken, ok := telegramApprovalBot(update.Message.Chat.ID)
-	if !ok || c.Query("secret") != telegramTopupWebhookSecret(botToken) {
+	botToken, botSecret, ok := telegramApprovalBot(update.Message.Chat.ID)
+	if !ok || c.Query("secret") != telegramTopupWebhookSecret(botToken, botSecret) {
 		c.Status(http.StatusUnauthorized)
 		return
 	}
@@ -883,7 +959,7 @@ func OtherPaymentTelegramWebhook(c *gin.Context) {
 
 func OtherPaymentLineWebhook(c *gin.Context) {
 	paymentSetting := operation_setting.GetPaymentSetting()
-	if paymentSetting.OtherPaymentConfirmSecret == "" || c.Query("secret") != paymentSetting.OtherPaymentConfirmSecret {
+	if !isOtherPaymentConfirmSecretValid(paymentSetting, c.Query("secret")) {
 		c.Status(http.StatusUnauthorized)
 		return
 	}

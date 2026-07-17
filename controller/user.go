@@ -585,6 +585,16 @@ func GetUserModels(c *gin.Context) {
 		return
 	}
 	groups := service.GetUserUsableGroups(user.Group)
+	requestedGroup := strings.TrimSpace(c.Query("group"))
+	if requestedGroup != "" {
+		if _, ok := groups[requestedGroup]; !ok {
+			common.ApiError(c, errors.New("group is not available"))
+			return
+		}
+		groups = map[string]string{
+			requestedGroup: groups[requestedGroup],
+		}
+	}
 	var models []string
 	for group := range groups {
 		for _, g := range model.GetGroupEnabledModels(group) {

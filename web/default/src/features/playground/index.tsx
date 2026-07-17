@@ -55,12 +55,12 @@ export function Playground() {
     null
   )
 
-  // Load models
+  // Load models for the selected group only
   const { data: modelsData, isLoading: isLoadingModels } = useQuery({
-    queryKey: ['playground-models', t],
+    queryKey: ['playground-models', config.group, t],
     queryFn: async () => {
       try {
-        return await getUserModels()
+        return await getUserModels(config.group)
       } catch (error) {
         toast.error(
           error instanceof Error
@@ -258,7 +258,9 @@ export function Playground() {
             isModelLoading={isLoadingModels}
             modelValue={config.model}
             models={models}
-            onGroupChange={(value) => updateConfig('group', value)}
+            onGroupChange={(value) => {
+              updateConfig('group', value)
+            }}
             onModelChange={(value) => updateConfig('model', value)}
             onStop={stopGeneration}
             onSubmit={handleSendMessage}

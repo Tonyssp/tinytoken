@@ -249,6 +249,13 @@ type EditableOtherPaymentMethod = {
   rate: number
   min_topup: number
   amount_options: number[]
+  telegram_enabled: boolean
+  telegram_bot_secret: string
+  telegram_chat_id: string
+  line_enabled: boolean
+  line_access_secret: string
+  line_group_id: string
+  confirm_secret: string
   enabled: boolean
 }
 
@@ -281,11 +288,95 @@ function parseOtherPaymentMethods(value: string): EditableOtherPaymentMethod[] {
         rate: Number(item.rate || 0),
         min_topup: Number(item.min_topup || 0),
         amount_options: parseNumberArray(item.amount_options),
+        telegram_enabled: item.telegram_enabled === true,
+        telegram_bot_secret: String(item.telegram_bot_secret || ''),
+        telegram_chat_id: String(item.telegram_chat_id || ''),
+        line_enabled: item.line_enabled === true,
+        line_access_secret: String(item.line_access_secret || ''),
+        line_group_id: String(item.line_group_id || ''),
+        confirm_secret: String(item.confirm_secret || ''),
         enabled: item.enabled !== false,
       }))
   } catch {
     return []
   }
+}
+
+function OtherPaymentMethodRateCalculator({
+  currency,
+  onApply,
+}: {
+  currency: string
+  onApply: (rate: number) => void
+}) {
+  const { t } = useTranslation()
+  const [paid, setPaid] = React.useState('30000')
+  const [credit, setCredit] = React.useState('30000')
+
+  const calculatedRate = React.useMemo(() => {
+    const paidAmount = Number(paid)
+    const creditAmount = Number(credit)
+    if (!Number.isFinite(paidAmount) || paidAmount <= 0) return 0
+    if (!Number.isFinite(creditAmount) || creditAmount <= 0) return 0
+    return creditAmount / paidAmount
+  }, [credit, paid])
+
+  return (
+    <div className='bg-muted/20 rounded-lg border p-3 sm:col-span-2'>
+      <div className='mb-3 flex items-start gap-2'>
+        <Calculator className='text-primary mt-0.5 size-4' />
+        <div>
+          <p className='text-sm font-medium'>{t('Exchange rate calculator')}</p>
+          <p className='text-muted-foreground text-xs'>
+            {t(
+              'Enter the transfer amount and the credit members should receive, then apply the calculated rate.'
+            )}
+          </p>
+        </div>
+      </div>
+      <div className='grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end'>
+        <FormItem>
+          <FormLabel>
+            {t('Member pays')} {currency ? `(${currency})` : ''}
+          </FormLabel>
+          <FormControl>
+            <Input
+              type='number'
+              step='1'
+              min={0}
+              value={paid}
+              onChange={(event) => setPaid(event.target.value)}
+            />
+          </FormControl>
+        </FormItem>
+        <FormItem>
+          <FormLabel>{t('Member receives credits')}</FormLabel>
+          <FormControl>
+            <Input
+              type='number'
+              step='0.01'
+              min={0}
+              value={credit}
+              onChange={(event) => setCredit(event.target.value)}
+            />
+          </FormControl>
+        </FormItem>
+        <Button
+          type='button'
+          variant='outline'
+          disabled={calculatedRate <= 0}
+          onClick={() => onApply(Number(calculatedRate.toFixed(6)))}
+        >
+          {t('Apply exchange rate')}
+        </Button>
+      </div>
+      {calculatedRate > 0 && (
+        <p className='text-muted-foreground mt-2 text-xs'>
+          {t('Credit rate')}: {calculatedRate.toFixed(6)}
+        </p>
+      )}
+    </div>
+  )
 }
 
 function OtherPaymentMethodsVisualEditor({
@@ -336,6 +427,13 @@ function OtherPaymentMethodsVisualEditor({
         rate: 0,
         min_topup: 0,
         amount_options: [],
+        telegram_enabled: false,
+        telegram_bot_secret: '',
+        telegram_chat_id: '',
+        line_enabled: false,
+        line_access_secret: '',
+        line_group_id: '',
+        confirm_secret: '',
         enabled: true,
       },
     ])
@@ -379,6 +477,20 @@ function OtherPaymentMethodsVisualEditor({
       rate: first.rate,
       min_topup: first.min_topup,
       amount_options: first.amount_options,
+    })
+  }
+
+  const copyFirstBotSettings = (index: number) => {
+    const first = methods[0]
+    if (!first) return
+    updateMethod(index, {
+      telegram_enabled: first.telegram_enabled,
+      telegram_bot_secret: first.telegram_bot_secret,
+      telegram_chat_id: first.telegram_chat_id,
+      line_enabled: first.line_enabled,
+      line_access_secret: first.line_access_secret,
+      line_group_id: first.line_group_id,
+      confirm_secret: first.confirm_secret,
     })
   }
 
@@ -504,6 +616,22 @@ function OtherPaymentMethodsVisualEditor({
                         </div>
                       </div>
 
+                      <div className='mt-4'>
+                        <OtherPaymentMethodRateCalculator
+                          currency={method.currency || defaultCurrency || 'LAK'}
+                          onApply={(rate) =>
+                            usesSharedSettings
+                              ? updateMethod(index, {
+                                  currency: defaultCurrency || 'LAK',
+                                  rate,
+                                  min_topup: Number(defaultMinTopUp || 0),
+                                  amount_options: sharedAmountOptions,
+                                })
+                              : updateMethod(index, { rate })
+                          }
+                        />
+                      </div>
+
                       {!usesSharedSettings && (
                         <div className='mt-4 grid gap-3 sm:grid-cols-2'>
                           <FormItem>
@@ -580,6 +708,168 @@ function OtherPaymentMethodsVisualEditor({
                           </FormItem>
                         </div>
                       )}
+                    </div>
+
+                    <div className='bg-background rounded-lg border p-3'>
+                      <div className='mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+                        <div>
+                          <p className='flex items-center gap-2 text-sm font-medium'>
+                            <Bell className='size-4' />
+                            {t('Bot settings for this method')}
+                          </p>
+                          <p className='text-muted-foreground text-xs'>
+                            {t(
+                              'Each payment channel can notify a different country bot or group.'
+                            )}
+                          </p>
+                        </div>
+                        {index > 0 && (
+                          <Button
+                            type='button'
+                            variant='outline'
+                            size='sm'
+                            onClick={() => copyFirstBotSettings(index)}
+                          >
+                            {t('Copy bot from first method')}
+                          </Button>
+                        )}
+                      </div>
+
+                      <div className='grid gap-3 sm:grid-cols-2'>
+                        <div className='rounded-lg border p-3'>
+                          <div className='mb-3 flex items-start justify-between gap-3'>
+                            <div>
+                              <FormLabel className='text-sm'>
+                                {t('Telegram approval bot')}
+                              </FormLabel>
+                              <FormDescription>
+                                {t(
+                                  'Send this method slips to its own Telegram group'
+                                )}
+                              </FormDescription>
+                            </div>
+                            <Switch
+                              checked={method.telegram_enabled}
+                              onCheckedChange={(checked) =>
+                                updateMethod(index, {
+                                  telegram_enabled: checked,
+                                })
+                              }
+                            />
+                          </div>
+                          <div className='space-y-3'>
+                            <FormItem>
+                              <FormLabel>{t('Bot token')}</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type='password'
+                                  autoComplete='new-password'
+                                  value={method.telegram_bot_secret}
+                                  placeholder={t('Enter new token to update')}
+                                  onChange={(event) =>
+                                    updateMethod(index, {
+                                      telegram_bot_secret: event.target.value,
+                                    })
+                                  }
+                                />
+                              </FormControl>
+                            </FormItem>
+                            <FormItem>
+                              <FormLabel>{t('Group chat ID')}</FormLabel>
+                              <FormControl>
+                                <Input
+                                  value={method.telegram_chat_id}
+                                  placeholder='-100xxxxxxxxxx'
+                                  onChange={(event) =>
+                                    updateMethod(index, {
+                                      telegram_chat_id: event.target.value,
+                                    })
+                                  }
+                                />
+                              </FormControl>
+                            </FormItem>
+                          </div>
+                        </div>
+
+                        <div className='rounded-lg border p-3'>
+                          <div className='mb-3 flex items-start justify-between gap-3'>
+                            <div>
+                              <FormLabel className='text-sm'>
+                                {t('LINE approval bot')}
+                              </FormLabel>
+                              <FormDescription>
+                                {t(
+                                  'Send this method notices to its own LINE group'
+                                )}
+                              </FormDescription>
+                            </div>
+                            <Switch
+                              checked={method.line_enabled}
+                              onCheckedChange={(checked) =>
+                                updateMethod(index, {
+                                  line_enabled: checked,
+                                })
+                              }
+                            />
+                          </div>
+                          <div className='space-y-3'>
+                            <FormItem>
+                              <FormLabel>{t('Channel access token')}</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type='password'
+                                  autoComplete='new-password'
+                                  value={method.line_access_secret}
+                                  placeholder={t('Enter new token to update')}
+                                  onChange={(event) =>
+                                    updateMethod(index, {
+                                      line_access_secret: event.target.value,
+                                    })
+                                  }
+                                />
+                              </FormControl>
+                            </FormItem>
+                            <FormItem>
+                              <FormLabel>{t('LINE group ID')}</FormLabel>
+                              <FormControl>
+                                <Input
+                                  value={method.line_group_id}
+                                  placeholder='Cxxxxxxxxxxxxxxxx'
+                                  onChange={(event) =>
+                                    updateMethod(index, {
+                                      line_group_id: event.target.value,
+                                    })
+                                  }
+                                />
+                              </FormControl>
+                            </FormItem>
+                          </div>
+                        </div>
+
+                        <FormItem className='sm:col-span-2'>
+                          <FormLabel>{t('Bot confirm secret')}</FormLabel>
+                          <FormControl>
+                            <Input
+                              type='password'
+                              autoComplete='new-password'
+                              value={method.confirm_secret}
+                              placeholder={t(
+                                'Optional per-method webhook secret'
+                              )}
+                              onChange={(event) =>
+                                updateMethod(index, {
+                                  confirm_secret: event.target.value,
+                                })
+                              }
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            {t(
+                              'Leave blank to use the global secret or automatic token hash.'
+                            )}
+                          </FormDescription>
+                        </FormItem>
+                      </div>
                     </div>
 
                     <div className='grid gap-3 sm:grid-cols-2'>
@@ -729,10 +1019,6 @@ export function PaymentSettingsSection({
   const [promptPayExchange, setPromptPayExchange] = React.useState({
     paid: '100',
     credit: '300',
-  })
-  const [otherPaymentExchange, setOtherPaymentExchange] = React.useState({
-    paid: '30000',
-    credit: '30000',
   })
 
   const complianceStatements = React.useMemo(
@@ -2465,71 +2751,6 @@ export function PaymentSettingsSection({
               />
             </div>
 
-            <div className='rounded-lg border p-4'>
-              <div className='mb-4 flex items-start gap-3'>
-                <Calculator className='text-primary mt-0.5 h-5 w-5' />
-                <div>
-                  <div className='font-medium'>
-                    {t('Exchange rate calculator')}
-                  </div>
-                  <p className='text-muted-foreground text-sm'>
-                    {t(
-                      'Enter the transfer amount and the credit members should receive, then apply the calculated rate.'
-                    )}
-                  </p>
-                </div>
-              </div>
-              <div className='grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end'>
-                <FormItem>
-                  <FormLabel>{t('Member pays')}</FormLabel>
-                  <FormControl>
-                    <Input
-                      type='number'
-                      step='1'
-                      min={0}
-                      value={otherPaymentExchange.paid}
-                      onChange={(event) =>
-                        setOtherPaymentExchange((current) => ({
-                          ...current,
-                          paid: event.target.value,
-                        }))
-                      }
-                    />
-                  </FormControl>
-                </FormItem>
-                <FormItem>
-                  <FormLabel>{t('Member receives credits')}</FormLabel>
-                  <FormControl>
-                    <Input
-                      type='number'
-                      step='0.01'
-                      min={0}
-                      value={otherPaymentExchange.credit}
-                      onChange={(event) =>
-                        setOtherPaymentExchange((current) => ({
-                          ...current,
-                          credit: event.target.value,
-                        }))
-                      }
-                    />
-                  </FormControl>
-                </FormItem>
-                <Button
-                  type='button'
-                  variant='outline'
-                  onClick={() =>
-                    applyExchangeRate(
-                      otherPaymentExchange.paid,
-                      otherPaymentExchange.credit,
-                      'OtherPaymentRate'
-                    )
-                  }
-                >
-                  {t('Apply exchange rate')}
-                </Button>
-              </div>
-            </div>
-
             <FormField
               control={form.control}
               name='OtherPaymentMethods'
@@ -2556,160 +2777,6 @@ export function PaymentSettingsSection({
                 </FormItem>
               )}
             />
-
-            <div className='grid gap-4 lg:grid-cols-3'>
-              <FormField
-                control={form.control}
-                name='OtherPaymentTelegramEnabled'
-                render={({ field }) => (
-                  <FormItem className='rounded-lg border p-4'>
-                    <div className='mb-4 flex items-center justify-between'>
-                      <div>
-                        <FormLabel className='flex items-center gap-2 text-base'>
-                          <Bell className='h-4 w-4' />
-                          {t('Telegram approval bot')}
-                        </FormLabel>
-                        <FormDescription>
-                          {t('Send manual payment slips to Telegram group')}
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </div>
-                    <div className='space-y-3'>
-                      <FormField
-                        control={form.control}
-                        name='OtherPaymentTelegramBotSecret'
-                        render={({ field: tokenField }) => (
-                          <FormItem>
-                            <FormLabel>{t('Bot token')}</FormLabel>
-                            <FormControl>
-                              <Input
-                                type='password'
-                                autoComplete='new-password'
-                                placeholder={t('Enter new token to update')}
-                                {...tokenField}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name='OtherPaymentTelegramChatId'
-                        render={({ field: chatField }) => (
-                          <FormItem>
-                            <FormLabel>{t('Group chat ID')}</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder='-100xxxxxxxxxx'
-                                {...chatField}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name='OtherPaymentLineEnabled'
-                render={({ field }) => (
-                  <FormItem className='rounded-lg border p-4'>
-                    <div className='mb-4 flex items-center justify-between'>
-                      <div>
-                        <FormLabel className='flex items-center gap-2 text-base'>
-                          <Bell className='h-4 w-4' />
-                          {t('LINE approval bot')}
-                        </FormLabel>
-                        <FormDescription>
-                          {t('Send manual payment notices to LINE group')}
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </div>
-                    <div className='space-y-3'>
-                      <FormField
-                        control={form.control}
-                        name='OtherPaymentLineAccessSecret'
-                        render={({ field: tokenField }) => (
-                          <FormItem>
-                            <FormLabel>{t('Channel access token')}</FormLabel>
-                            <FormControl>
-                              <Input
-                                type='password'
-                                autoComplete='new-password'
-                                placeholder={t('Enter new token to update')}
-                                {...tokenField}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name='OtherPaymentLineGroupId'
-                        render={({ field: groupField }) => (
-                          <FormItem>
-                            <FormLabel>{t('LINE group ID')}</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder='Cxxxxxxxxxxxxxxxx'
-                                {...groupField}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name='OtherPaymentConfirmSecret'
-                render={({ field }) => (
-                  <FormItem className='rounded-lg border p-4'>
-                    <FormLabel className='flex items-center gap-2 text-base'>
-                      <ShieldAlert className='h-4 w-4' />
-                      {t('Bot confirm secret')}
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        type='password'
-                        autoComplete='new-password'
-                        placeholder={t('Enter new secret to update')}
-                        {...field}
-                        onChange={(event) => field.onChange(event.target.value)}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      {t(
-                        'Webhook URL: /api/payment/other/telegram/webhook?secret=YOUR_SECRET and /api/payment/other/line/webhook?secret=YOUR_SECRET'
-                      )}
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
 
             <Button
               type='button'

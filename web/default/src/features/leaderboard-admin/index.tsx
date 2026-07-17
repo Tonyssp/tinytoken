@@ -83,6 +83,32 @@ const PERIOD_OPTIONS = [
   ['all', 'ทั้งหมด'],
 ] as const
 
+const PERIOD_VISIBILITY_OPTIONS: Record<
+  LeaderboardPeriod,
+  { optionKey: string; switchLabel: string }
+> = {
+  today: {
+    optionKey: 'RankingsTodayPeriodEnabled',
+    switchLabel: 'โชว์ปุ่มวันนี้',
+  },
+  week: {
+    optionKey: 'RankingsWeekPeriodEnabled',
+    switchLabel: 'โชว์ปุ่ม 7 วัน',
+  },
+  month: {
+    optionKey: 'RankingsMonthPeriodEnabled',
+    switchLabel: 'โชว์ปุ่ม 30 วัน',
+  },
+  year: {
+    optionKey: 'RankingsYearPeriodEnabled',
+    switchLabel: 'โชว์ปุ่มปี',
+  },
+  all: {
+    optionKey: 'RankingsAllPeriodEnabled',
+    switchLabel: 'โชว์ปุ่มตลอดเวลา',
+  },
+}
+
 function toNumber(value: unknown) {
   const numberValue = Number(value)
   return Number.isFinite(numberValue) && numberValue > 0 ? numberValue : 0
@@ -196,14 +222,23 @@ export function LeaderboardAdmin() {
         'UserLeaderboardEntries',
         '[]'
       )}
-      initialYearPeriodEnabled={
-        readOption(optionsData?.data, 'RankingsYearPeriodEnabled', 'true') !==
-        'false'
-      }
-      initialAllPeriodEnabled={
-        readOption(optionsData?.data, 'RankingsAllPeriodEnabled', 'true') !==
-        'false'
-      }
+      initialPeriodVisibility={{
+        today:
+          readOption(optionsData?.data, 'RankingsTodayPeriodEnabled', 'true') !==
+          'false',
+        week:
+          readOption(optionsData?.data, 'RankingsWeekPeriodEnabled', 'true') !==
+          'false',
+        month:
+          readOption(optionsData?.data, 'RankingsMonthPeriodEnabled', 'true') !==
+          'false',
+        year:
+          readOption(optionsData?.data, 'RankingsYearPeriodEnabled', 'true') !==
+          'false',
+        all:
+          readOption(optionsData?.data, 'RankingsAllPeriodEnabled', 'true') !==
+          'false',
+      }}
     />
   )
 }
@@ -211,8 +246,7 @@ export function LeaderboardAdmin() {
 function LeaderboardAdminEditor(props: {
   initialEnabled: boolean
   initialSerialized: string
-  initialYearPeriodEnabled: boolean
-  initialAllPeriodEnabled: boolean
+  initialPeriodVisibility: Record<LeaderboardPeriod, boolean>
 }) {
   const queryClient = useQueryClient()
   const initialEntries = useMemo(
@@ -223,11 +257,8 @@ function LeaderboardAdminEditor(props: {
   const [entries, setEntries] = useState<LeaderboardEntry[]>(initialEntries)
   const [period, setPeriod] = useState<LeaderboardPeriod>('month')
   const [search, setSearch] = useState('')
-  const [yearPeriodEnabled, setYearPeriodEnabled] = useState(
-    props.initialYearPeriodEnabled
-  )
-  const [allPeriodEnabled, setAllPeriodEnabled] = useState(
-    props.initialAllPeriodEnabled
+  const [periodVisibility, setPeriodVisibility] = useState(
+    props.initialPeriodVisibility
   )
 
   const candidatesQuery = useQuery({
@@ -269,8 +300,9 @@ function LeaderboardAdminEditor(props: {
   const serializedEntries = serializeEntries(entries)
   const isDirty =
     enabled !== props.initialEnabled ||
-    yearPeriodEnabled !== props.initialYearPeriodEnabled ||
-    allPeriodEnabled !== props.initialAllPeriodEnabled ||
+    PERIOD_OPTIONS.some(
+      ([value]) => periodVisibility[value] !== props.initialPeriodVisibility[value]
+    ) ||
     serializedEntries !== props.initialSerialized
   const enabledEntries = entries.filter((entry) => entry.enabled)
   const fakeCount = entries.filter((entry) => entry.type === 'fake').length
@@ -287,14 +319,12 @@ function LeaderboardAdminEditor(props: {
           key: 'UserLeaderboardEntries',
           value: serializedEntries,
         }),
-        updateSystemOption({
-          key: 'RankingsYearPeriodEnabled',
-          value: yearPeriodEnabled,
-        }),
-        updateSystemOption({
-          key: 'RankingsAllPeriodEnabled',
-          value: allPeriodEnabled,
-        }),
+        ...PERIOD_OPTIONS.map(([value]) =>
+          updateSystemOption({
+            key: PERIOD_VISIBILITY_OPTIONS[value].optionKey,
+            value: periodVisibility[value],
+          })
+        ),
       ])
       const failed = responses.find((response) => !response.success)
       if (failed)
@@ -392,16 +422,6 @@ function LeaderboardAdminEditor(props: {
                   checked={enabled}
                   onCheckedChange={setEnabled}
                 />
-                <ToggleRow
-                  label='โชว์ปุ่มปี'
-                  checked={yearPeriodEnabled}
-                  onCheckedChange={setYearPeriodEnabled}
-                />
-                <ToggleRow
-                  label='โชว์ปุ่มตลอดเวลา'
-                  checked={allPeriodEnabled}
-                  onCheckedChange={setAllPeriodEnabled}
-                />
               </div>
             </div>
 
@@ -427,21 +447,26 @@ function LeaderboardAdminEditor(props: {
                 </div>
                 <Users className='text-muted-foreground size-5' />
               </div>
-              <div className='mt-4 flex flex-wrap gap-2'>
-                {PERIOD_OPTIONS.map(([value, label]) => (
-                  <button
-                    key={value}
-                    type='button'
-                    onClick={() => setPeriod(value)}
-                    className={`h-9 rounded-lg px-3 text-xs font-bold transition ${
-                      period === value
-                        ? 'bg-foreground text-background'
-                        : 'bg-muted text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
+              <div className='mt-4 flex flex-wrap items-center gap-2'>
+                {PERIOD_OPTIONS.map(([value, label]) => {
+                  const isSelected = period === value
+                  return (
+                    <PeriodButtonWithSwitch
+                      key={value}
+                      label={label}
+                      switchLabel={PERIOD_VISIBILITY_OPTIONS[value].switchLabel}
+                      selected={isSelected}
+                      checked={periodVisibility[value]}
+                      onSelect={() => setPeriod(value)}
+                      onCheckedChange={(checked) =>
+                        setPeriodVisibility((current) => ({
+                          ...current,
+                          [value]: checked,
+                        }))
+                      }
+                    />
+                  )
+                })}
               </div>
               <div className='relative mt-4'>
                 <Search className='text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2' />
@@ -751,6 +776,41 @@ function ToggleRow(props: {
     <div className='flex min-w-52 items-center justify-between gap-4'>
       <span className='text-sm font-semibold'>{props.label}</span>
       <Switch checked={props.checked} onCheckedChange={props.onCheckedChange} />
+    </div>
+  )
+}
+
+function PeriodButtonWithSwitch(props: {
+  label: string
+  switchLabel: string
+  selected: boolean
+  checked: boolean
+  onSelect: () => void
+  onCheckedChange: (checked: boolean) => void
+}) {
+  return (
+    <div
+      className={`flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-bold transition ${
+        props.selected
+          ? 'bg-foreground text-background'
+          : 'bg-muted text-muted-foreground hover:text-foreground'
+      }`}
+    >
+      <button
+        type='button'
+        onClick={props.onSelect}
+        className='h-full font-bold'
+      >
+        {props.label}
+      </button>
+      <span className='hidden text-[11px] font-semibold sm:inline'>
+        {props.switchLabel}
+      </span>
+      <Switch
+        checked={props.checked}
+        onCheckedChange={props.onCheckedChange}
+        className='scale-75'
+      />
     </div>
   )
 }

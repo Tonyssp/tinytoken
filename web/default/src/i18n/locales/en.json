@@ -4670,6 +4670,13 @@
     "Add bank accounts or other payment methods here. Each enabled method becomes a choice on the member wallet page.": "Add bank accounts or other payment methods here. Each enabled method becomes a choice on the member wallet page.",
     "Add your first payment method": "Add your first payment method",
     "Remove payment method": "Remove payment method",
-    "Transfer the exact amount, then upload the slip below.": "Transfer the exact amount, then upload the slip below."
+    "Transfer the exact amount, then upload the slip below.": "Transfer the exact amount, then upload the slip below.",
+    "Bot settings for this method": "Bot settings for this method",
+    "Each payment channel can notify a different country bot or group.": "Each payment channel can notify a different country bot or group.",
+    "Copy bot from first method": "Copy bot from first method",
+    "Send this method slips to its own Telegram group": "Send this method slips to its own Telegram group",
+    "Send this method notices to its own LINE group": "Send this method notices to its own LINE group",
+    "Optional per-method webhook secret": "Optional per-method webhook secret",
+    "Leave blank to use the global secret or automatic token hash.": "Leave blank to use the global secret or automatic token hash."
   }
 }

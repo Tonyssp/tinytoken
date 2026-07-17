@@ -49,18 +49,25 @@ type PaymentSetting struct {
 }
 
 type OtherPaymentMethod struct {
-	Id            string `json:"id"`
-	Name          string `json:"name"`
-	BankName      string `json:"bank_name"`
-	AccountName   string `json:"account_name"`
-	AccountNumber string `json:"account_number"`
-	QRImageURL    string `json:"qr_image_url"`
-	Note          string `json:"note"`
-	Currency      string `json:"currency,omitempty"`
-	Rate          float64 `json:"rate,omitempty"`
-	MinTopUp      float64 `json:"min_topup,omitempty"`
-	AmountOptions []int   `json:"amount_options,omitempty"`
-	Enabled       bool   `json:"enabled"`
+	Id               string  `json:"id"`
+	Name             string  `json:"name"`
+	BankName         string  `json:"bank_name"`
+	AccountName      string  `json:"account_name"`
+	AccountNumber    string  `json:"account_number"`
+	QRImageURL       string  `json:"qr_image_url"`
+	Note             string  `json:"note"`
+	Currency         string  `json:"currency,omitempty"`
+	Rate             float64 `json:"rate,omitempty"`
+	MinTopUp         float64 `json:"min_topup,omitempty"`
+	AmountOptions    []int   `json:"amount_options,omitempty"`
+	TelegramEnabled  bool    `json:"telegram_enabled,omitempty"`
+	TelegramBotToken string  `json:"telegram_bot_secret,omitempty"`
+	TelegramChatId   string  `json:"telegram_chat_id,omitempty"`
+	LineEnabled      bool    `json:"line_enabled,omitempty"`
+	LineAccessToken  string  `json:"line_access_secret,omitempty"`
+	LineGroupId      string  `json:"line_group_id,omitempty"`
+	ConfirmSecret    string  `json:"confirm_secret,omitempty"`
+	Enabled          bool    `json:"enabled"`
 }
 
 const CurrentComplianceTermsVersion = "v1"

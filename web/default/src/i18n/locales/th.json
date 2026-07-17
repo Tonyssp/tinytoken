@@ -4640,6 +4640,13 @@
     "Add bank accounts or other payment methods here. Each enabled method becomes a choice on the member wallet page.": "เพิ่มบัญชีธนาคารหรือช่องทางชำระเงินอื่นได้ที่นี่ ช่องทางที่เปิดใช้งานจะแสดงให้สมาชิกเลือกในหน้ากระเป๋าเงิน",
     "Add your first payment method": "เพิ่มช่องทางชำระเงินแรก",
     "Remove payment method": "ลบช่องทางชำระเงิน",
-    "Transfer the exact amount, then upload the slip below.": "โอนเงินตามยอดที่ระบุ แล้วอัปโหลดสลิปด้านล่าง"
+    "Transfer the exact amount, then upload the slip below.": "โอนเงินตามยอดที่ระบุ แล้วอัปโหลดสลิปด้านล่าง",
+    "Bot settings for this method": "ตั้งค่าบอทสำหรับช่องทางนี้",
+    "Each payment channel can notify a different country bot or group.": "แต่ละช่องทางแจ้งเตือนไปยังบอทหรือกลุ่มของแต่ละประเทศได้",
+    "Copy bot from first method": "คัดลอกบอทจากช่องทางแรก",
+    "Send this method slips to its own Telegram group": "ส่งสลิปของช่องทางนี้ไปยังกลุ่ม Telegram ของตัวเอง",
+    "Send this method notices to its own LINE group": "ส่งแจ้งเตือนของช่องทางนี้ไปยังกลุ่ม LINE ของตัวเอง",
+    "Optional per-method webhook secret": "รหัสลับ webhook เฉพาะช่องทางนี้ (ไม่บังคับ)",
+    "Leave blank to use the global secret or automatic token hash.": "เว้นว่างเพื่อใช้รหัสลับส่วนกลาง หรือให้ระบบสร้างจาก token อัตโนมัติ"
   }
 }

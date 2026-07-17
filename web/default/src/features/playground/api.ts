@@ -25,6 +25,16 @@ import type {
   GroupOption,
 } from './types'
 
+type PricingModelGroup = {
+  model_name?: string
+  enable_groups?: string[]
+}
+
+type PricingResponse = {
+  success?: boolean
+  data?: PricingModelGroup[]
+}
+
 /**
  * Send chat completion request (non-streaming)
  */
@@ -40,15 +50,45 @@ export async function sendChatCompletion(
 /**
  * Get user available models
  */
-export async function getUserModels(): Promise<ModelOption[]> {
-  const res = await api.get(API_ENDPOINTS.USER_MODELS)
+export async function getUserModels(group?: string): Promise<ModelOption[]> {
+  const res = await api.get(API_ENDPOINTS.USER_MODELS, {
+    params: group ? { group } : undefined,
+  })
   const { data } = res
 
   if (!data.success || !Array.isArray(data.data)) {
     return []
   }
 
-  return data.data.map((model: string) => ({
+  let models = data.data as string[]
+
+  // Older backend builds ignore ?group=, so keep a frontend fallback based on
+  // pricing metadata. New backend builds already return the filtered list.
+  if (group) {
+    try {
+      const pricingRes = await api.get<PricingResponse>('/api/pricing')
+      const pricingModels = pricingRes.data.data || []
+      const allowed = new Set(
+        pricingModels
+          .filter((model) => {
+            const groups = Array.isArray(model.enable_groups)
+              ? model.enable_groups
+              : []
+            return groups.includes(group) || groups.includes('all')
+          })
+          .map((model) => model.model_name)
+          .filter((modelName): modelName is string => Boolean(modelName))
+      )
+
+      if (allowed.size > 0) {
+        models = models.filter((model) => allowed.has(model))
+      }
+    } catch {
+      // If pricing is unavailable, keep the backend model list.
+    }
+  }
+
+  return models.map((model: string) => ({
     label: model,
     value: model,
   }))

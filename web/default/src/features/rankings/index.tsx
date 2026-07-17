@@ -40,6 +40,9 @@ export function Rankings() {
   const navigate = useNavigate()
   const { status } = useStatus()
   const visiblePeriods = VALID_PERIODS.filter((period) => {
+    if (period === 'today') return status?.rankings_today_period_enabled !== false
+    if (period === 'week') return status?.rankings_week_period_enabled !== false
+    if (period === 'month') return status?.rankings_month_period_enabled !== false
     if (period === 'year') return status?.rankings_year_period_enabled !== false
     if (period === 'all') return status?.rankings_all_period_enabled !== false
     return true
@@ -50,8 +53,10 @@ export function Rankings() {
   )
     ? visiblePeriods.includes(search.period as RankingPeriod)
       ? (search.period as RankingPeriod)
-      : 'month'
-    : 'week'
+      : visiblePeriods[0] || 'month'
+    : visiblePeriods.includes('week')
+      ? 'week'
+      : visiblePeriods[0] || 'month'
   const view = search.view === 'users' ? 'users' : 'models'
 
   const rankingsQuery = useRankings(period)
