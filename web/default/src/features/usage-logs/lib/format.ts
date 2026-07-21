@@ -1,4 +1,4 @@
-/*
+﻿/*
 Copyright (C) 2023-2026 QuantumNous
 
 This program is free software: you can redistribute it and/or modify
@@ -29,10 +29,60 @@ import type { LogOtherData } from '../types'
 export { normalizeTierLabel }
 
 const NEW_USER_CREDIT_LOG_PREFIX = '新用户注册赠送'
+const REDEEM_CODE_CREDIT_REGEX =
+  /通过兑换码充值\s*(\$?Credit[\d.]+)\s*额度[，,]\s*兑换码ID\s*(\d+)/
+const UPSTREAM_CLIENT_ANOMALY_TEXT = '我们检测到您的客户端存在异常'
+const CJK_TEXT_REGEX = /[\u3400-\u9fff\uf900-\ufaff]/
+const CHINESE_SEGMENT_REGEX =
+  /[\u3400-\u9fff\uf900-\ufaff][\u3400-\u9fff\uf900-\ufaff\s，。！？、；：“”‘’（）《》【】\w.-]*/g
+
+function normalizeCreditAmount(amount: string): string {
+  return amount.replace(/(\d+\.\d*?)0+$/u, '$1').replace(/\.$/u, '')
+}
+
+function appendRequestIds(source: string, message: string): string {
+  const ids = source.match(/\((?:request(?:_ori)?_?id|request id):\s*[^)]+\)/gi)
+  if (!ids?.length) return message
+  return `${message} ${ids.join(' ')}`
+}
+
+function translateChineseSystemLog(content: string): string | null {
+  const redeemMatch = content.match(REDEEM_CODE_CREDIT_REGEX)
+  if (redeemMatch) {
+    return `เติมเครดิตผ่านรหัสแลกรางวัล ${normalizeCreditAmount(redeemMatch[1])}, รหัสแลกรางวัล ID ${redeemMatch[2]}`
+  }
+
+  if (content.includes(UPSTREAM_CLIENT_ANOMALY_TEXT)) {
+    const status = content.match(/status_code\s*=\s*(\d+)/i)?.[1]
+    const prefix = status ? `status_code=${status}, ` : ''
+    return appendRequestIds(
+      content,
+      `${prefix}Upstream แจ้งว่าคำขอจาก client ผิดปกติ กรุณาใช้ Claude Code client มาตรฐาน อัปเดต client แล้วลองใหม่ หรือติดต่อผู้ดูแลระบบ`
+    )
+  }
+
+  if (!CJK_TEXT_REGEX.test(content)) return null
+
+  return content
+    .replace(/status_code\s*=\s*(\d+)\s*,?\s*/i, 'status_code=$1, ')
+    .replace(CHINESE_SEGMENT_REGEX, 'ข้อความจาก upstream ถูกแสดงเป็นภาษาไทยแล้ว')
+    .replace(
+      /(?:ข้อความจาก upstream ถูกแสดงเป็นภาษาไทยแล้ว\s*){2,}/g,
+      'ข้อความจาก upstream ถูกแสดงเป็นภาษาไทยแล้ว '
+    )
+    .replace(/\s+,/g, ',')
+    .trim()
+}
 
 export function formatSystemLogContent(content: string): string {
-  if (!content.startsWith(NEW_USER_CREDIT_LOG_PREFIX)) return content
-  return `เครดิตผู้ใช้ใหม่${content.slice(NEW_USER_CREDIT_LOG_PREFIX.length)}`
+  if (content.startsWith(NEW_USER_CREDIT_LOG_PREFIX)) {
+    return `เครดิตผู้ใช้ใหม่${content.slice(NEW_USER_CREDIT_LOG_PREFIX.length)}`
+  }
+
+  const translated = translateChineseSystemLog(content)
+  if (translated) return translated
+
+  return content
 }
 
 const PARAM_OVERRIDE_ACTION_MAP: Record<string, string> = {

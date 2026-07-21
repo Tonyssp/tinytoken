@@ -33,6 +33,7 @@ import {
   ShieldAlert,
   Trash2,
   UploadCloud,
+  X,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -396,6 +397,12 @@ function OtherPaymentMethodsVisualEditor({
 }) {
   const { t } = useTranslation()
   const methods = React.useMemo(() => parseOtherPaymentMethods(value), [value])
+  const fileInputRefs = React.useRef<Record<string, HTMLInputElement | null>>(
+    {}
+  )
+  const [amountDrafts, setAmountDrafts] = React.useState<
+    Record<string, string>
+  >({})
   const sharedAmountOptions = React.useMemo(() => {
     try {
       return parseNumberArray(JSON.parse(defaultAmountOptions || '[]'))
@@ -410,6 +417,57 @@ function OtherPaymentMethodsVisualEditor({
     },
     [onChange]
   )
+
+  React.useEffect(() => {
+    setAmountDrafts((current) => {
+      const next = { ...current }
+      const validIds = new Set(methods.map((method) => method.id))
+      for (const method of methods) {
+        if (next[method.id] === undefined) {
+          next[method.id] = method.amount_options.join(', ')
+        }
+      }
+      for (const id of Object.keys(next)) {
+        if (!validIds.has(id)) {
+          delete next[id]
+        }
+      }
+      return next
+    })
+  }, [methods])
+
+  const parseAmountDraft = (draft: string) =>
+    draft
+      .split(/[\s,]+/)
+      .map((item) => Number(item.trim()))
+      .filter((item) => Number.isFinite(item) && item > 0)
+
+  const handleQrFileSelect = (
+    index: number,
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      toast.error(t('Please choose an image file'))
+      return
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error(t('QR image must be smaller than 2 MB'))
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      updateMethod(index, { qr_image_url: String(reader.result || '') })
+      toast.success(t('QR image selected'))
+    }
+    reader.onerror = () => toast.error(t('Failed to read QR image'))
+    reader.readAsDataURL(file)
+  }
 
   const addMethod = () => {
     const nextNumber = methods.length + 1
@@ -539,10 +597,15 @@ function OtherPaymentMethodsVisualEditor({
                 return (
                   <>
                     <div className='flex items-center justify-between gap-3'>
-                      <div className='min-w-0'>
-                        <p className='truncate font-semibold'>
-                          {method.name || `${t('Payment method')} ${index + 1}`}
-                        </p>
+                      <div className='min-w-0 flex-1'>
+                        <Input
+                          value={method.name}
+                          placeholder={`${t('Payment method')} ${index + 1}`}
+                          className='h-9 max-w-md font-semibold'
+                          onChange={(event) =>
+                            updateMethod(index, { name: event.target.value })
+                          }
+                        />
                         <p className='text-muted-foreground text-xs'>
                           {t('Payment method')} {index + 1}
                         </p>
@@ -686,23 +749,25 @@ function OtherPaymentMethodsVisualEditor({
                             <FormLabel>{t('Suggested amounts')}</FormLabel>
                             <FormControl>
                               <Input
-                                value={method.amount_options.join(', ')}
+                                value={
+                                  amountDrafts[method.id] ??
+                                  method.amount_options.join(', ')
+                                }
                                 placeholder={
                                   sharedAmountOptions.length
                                     ? sharedAmountOptions.join(', ')
                                     : '30000, 50000, 100000'
                                 }
-                                onChange={(event) =>
+                                onChange={(event) => {
+                                  const draft = event.target.value
+                                  setAmountDrafts((current) => ({
+                                    ...current,
+                                    [method.id]: draft,
+                                  }))
                                   updateMethod(index, {
-                                    amount_options: event.target.value
-                                      .split(',')
-                                      .map((item) => Number(item.trim()))
-                                      .filter(
-                                        (item) =>
-                                          Number.isFinite(item) && item > 0
-                                      ),
+                                    amount_options: parseAmountDraft(draft),
                                   })
-                                }
+                                }}
                               />
                             </FormControl>
                           </FormItem>
@@ -926,12 +991,73 @@ function OtherPaymentMethodsVisualEditor({
                         </FormControl>
                       </FormItem>
                       <FormItem className='sm:col-span-2'>
-                        <FormLabel>{t('QR image URL')}</FormLabel>
+                        <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+                          <FormLabel>{t('QR image')}</FormLabel>
+                          <div className='flex flex-wrap gap-2'>
+                            <input
+                              ref={(node) => {
+                                fileInputRefs.current[method.id] = node
+                              }}
+                              type='file'
+                              accept='image/png,image/jpeg,image/webp,image/gif'
+                              className='hidden'
+                              onChange={(event) =>
+                                handleQrFileSelect(index, event)
+                              }
+                            />
+                            <Button
+                              type='button'
+                              variant='outline'
+                              size='sm'
+                              className='gap-2'
+                              onClick={() =>
+                                fileInputRefs.current[method.id]?.click()
+                              }
+                            >
+                              <UploadCloud className='size-4' />
+                              {t('Choose QR image')}
+                            </Button>
+                            {method.qr_image_url && (
+                              <Button
+                                type='button'
+                                variant='ghost'
+                                size='sm'
+                                className='gap-2'
+                                onClick={() =>
+                                  updateMethod(index, { qr_image_url: '' })
+                                }
+                              >
+                                <X className='size-4' />
+                                {t('Clear')}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                        {method.qr_image_url && (
+                          <div className='mt-2 flex items-center gap-3 rounded-lg border bg-muted/20 p-3'>
+                            <img
+                              src={method.qr_image_url}
+                              alt={t('QR image preview')}
+                              className='size-20 rounded-md border bg-background object-contain'
+                            />
+                            <p className='text-muted-foreground text-xs'>
+                              {method.qr_image_url.startsWith('data:')
+                                ? t(
+                                    'Local QR image is saved inside this payment method.'
+                                  )
+                                : t(
+                                    'External QR image URL is still supported.'
+                                  )}
+                            </p>
+                          </div>
+                        )}
                         <FormControl>
                           <Input
-                            type='url'
+                            className='mt-2'
                             value={method.qr_image_url}
-                            placeholder='https://example.com/payment-qr.png'
+                            placeholder={t(
+                              'Optional: paste an image URL or choose a local file'
+                            )}
                             onChange={(event) =>
                               updateMethod(index, {
                                 qr_image_url: event.target.value,

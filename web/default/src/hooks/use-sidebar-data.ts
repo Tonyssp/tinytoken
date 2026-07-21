@@ -23,6 +23,7 @@ import {
   FileText,
   FlaskConical,
   Key,
+  ImagePlus,
   LayoutDashboard,
   ListTodo,
   MessageSquare,
@@ -56,6 +57,11 @@ export function useSidebarData(): SidebarData {
             title: t('Playground'),
             url: '/playground',
             icon: FlaskConical,
+          },
+          {
+            title: t('Drawing'),
+            url: '/drawing',
+            icon: ImagePlus,
           },
           {
             title: t('Chat'),
