@@ -42,9 +42,25 @@ func OpenaiImageHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.
 	// 写入新的 response body
 	service.IOCopyBytesGracefully(c, resp, responseBody)
 
+	applyActualImageCountRatio(info, responseBody)
 	normalizeOpenAIUsage(&usageResp.Usage)
 	applyUsagePostProcessing(info, &usageResp.Usage, responseBody)
 	return &usageResp.Usage, nil
+}
+
+func applyActualImageCountRatio(info *relaycommon.RelayInfo, responseBody []byte) {
+	if info == nil || len(responseBody) == 0 {
+		return
+	}
+
+	var imageResp dto.ImageResponse
+	if err := common.Unmarshal(responseBody, &imageResp); err != nil {
+		return
+	}
+	if len(imageResp.Data) == 0 {
+		return
+	}
+	info.PriceData.AddOtherRatio("n", float64(len(imageResp.Data)))
 }
 
 // normalizeOpenAIUsage maps the OpenAI Images usage shape (input_tokens /
@@ -211,6 +227,7 @@ func OpenaiImageJSONAsStreamHandler(c *gin.Context, info *relaycommon.RelayInfo,
 		return nil, types.WithOpenAIError(*oaiError, resp.StatusCode)
 	}
 	normalizeOpenAIUsage(&usageResp.Usage)
+	applyActualImageCountRatio(info, responseBody)
 	applyUsagePostProcessing(info, &usageResp.Usage, responseBody)
 
 	helper.SetEventStreamHeaders(c)

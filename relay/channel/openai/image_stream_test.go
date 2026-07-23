@@ -134,6 +134,21 @@ func TestOpenaiImageHandlersReturnJSONError(t *testing.T) {
 	})
 }
 
+func TestOpenaiImageHandlerUsesActualImageCountForBillingRatio(t *testing.T) {
+	oldMode := gin.Mode()
+	gin.SetMode(gin.TestMode)
+	t.Cleanup(func() { gin.SetMode(oldMode) })
+
+	body := `{"created":1710000000,"data":[{"b64_json":"final"}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}`
+
+	c, _, resp, info := newImageTestContext(t, body, "application/json", false)
+
+	usage, err := OpenaiImageHandler(c, info, resp)
+	require.Nil(t, err)
+	require.NotNil(t, usage)
+	require.Equal(t, 1.0, info.PriceData.OtherRatios["n"])
+}
+
 // TestOpenaiImageStreamHandlerRecordsUpstreamErrorEvent verifies that an error
 // event inside the SSE stream is recorded as a soft error while the payload is
 // still forwarded to the client.

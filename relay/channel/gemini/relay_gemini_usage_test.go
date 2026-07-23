@@ -124,6 +124,40 @@ func TestGeminiStreamHandlerCompletionTokensExcludeToolUsePromptTokens(t *testin
 	require.Equal(t, 1120, usage.CompletionTokenDetails.ReasoningTokens)
 }
 
+func TestGeminiImageHandlerUsesActualImageCountForBillingRatio(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", nil)
+
+	info := &relaycommon.RelayInfo{
+		OriginModelName: "imagen-4.0-generate-preview-06-06",
+		ChannelMeta: &relaycommon.ChannelMeta{
+			UpstreamModelName: "imagen-4.0-generate-preview-06-06",
+		},
+	}
+
+	payload := dto.GeminiImageResponse{
+		Predictions: []dto.GeminiImagePrediction{
+			{MimeType: "image/png", BytesBase64Encoded: "final"},
+		},
+	}
+
+	body, err := common.Marshal(payload)
+	require.NoError(t, err)
+
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(bytes.NewReader(body)),
+	}
+
+	usage, newAPIError := GeminiImageHandler(c, info, resp)
+	require.Nil(t, newAPIError)
+	require.NotNil(t, usage)
+	require.Equal(t, 258, usage.TotalTokens)
+	require.Equal(t, 1.0, info.PriceData.OtherRatios["n"])
+}
+
 func TestGeminiTextGenerationHandlerPromptTokensIncludeToolUsePromptTokens(t *testing.T) {
 	t.Parallel()
 
