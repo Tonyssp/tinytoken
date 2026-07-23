@@ -47,7 +47,10 @@ export type GenerateImagePayload = {
 
 function mapImageResponse(data: OpenAIImageResponse): DrawingResult[] {
   return (data.data || []).map((item, index) => ({
-    id: `${Date.now()}-${index}`,
+    id:
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${index}`,
     url: item.url,
     b64: item.b64_json,
     revisedPrompt: item.revised_prompt,
@@ -93,9 +96,13 @@ export async function generateImage(
     body.quality = payload.quality
   }
 
-  const res = await api.post<OpenAIImageResponse>('/v1/images/generations', body, {
-    headers,
-    skipErrorHandler: true,
-  } as Record<string, unknown>)
+  const res = await api.post<OpenAIImageResponse>(
+    '/v1/images/generations',
+    body,
+    {
+      headers,
+      skipErrorHandler: true,
+    } as Record<string, unknown>
+  )
   return mapImageResponse(res.data)
 }
