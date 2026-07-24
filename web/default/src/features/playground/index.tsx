@@ -18,16 +18,27 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useCallback, useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { MessageSquareText, Plus, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { MessageSquareText, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { getUserModels, getUserGroups } from './api'
 import { PlaygroundChat } from './components/playground-chat'
 import { PlaygroundInput } from './components/playground-input'
 import { usePlaygroundState, useChatHandler } from './hooks'
-import { createUserMessage, createLoadingAssistantMessage } from './lib'
-import type { Message as MessageType } from './types'
+import {
+  createUserMessage,
+  createLoadingAssistantMessage,
+  createPlaygroundSessionId,
+  deletePlaygroundSession,
+  loadPlaygroundSessions,
+  savePlaygroundSession,
+  type PlaygroundSession,
+} from './lib'
+import type {
+  Message as MessageType,
+  PlaygroundAttachment,
+} from './types'
 
 export function Playground() {
   const { t } = useTranslation()
@@ -49,6 +60,14 @@ export function Playground() {
     parameterEnabled,
     onMessageUpdate: updateMessages,
   })
+  const [sessions, setSessions] = useState<PlaygroundSession[]>([])
+  const [activeSessionId, setActiveSessionId] = useState(
+    createPlaygroundSessionId
+  )
+  const [activeSessionCreatedAt, setActiveSessionCreatedAt] = useState(() =>
+    Date.now()
+  )
+  const [sessionsReady, setSessionsReady] = useState(false)
 
   // Edit dialog state
   const [editingMessageKey, setEditingMessageKey] = useState<string | null>(
@@ -117,15 +136,53 @@ export function Playground() {
     }
   }, [groupsData, setGroups, config.group, updateConfig])
 
-  const handleSendMessage = (text: string) => {
-    const userMessage = createUserMessage(text)
+  useEffect(() => {
+    void loadPlaygroundSessions()
+      .then(setSessions)
+      .catch(() => toast.error('โหลดประวัติบทสนทนาไม่สำเร็จ'))
+      .finally(() => setSessionsReady(true))
+  }, [])
+
+  useEffect(() => {
+    if (!sessionsReady || messages.length === 0) return
+
+    const timeout = window.setTimeout(() => {
+      const firstUserMessage = messages.find(
+        (message) => message.from === 'user'
+      )
+      const title =
+        firstUserMessage?.versions[0]?.content.trim().slice(0, 42) ||
+        firstUserMessage?.attachments?.[0]?.filename ||
+        'บทสนทนาใหม่'
+      const session: PlaygroundSession = {
+        id: activeSessionId,
+        title,
+        createdAt: activeSessionCreatedAt,
+        updatedAt: Date.now(),
+        messages,
+      }
+
+      void savePlaygroundSession(session)
+        .then(setSessions)
+        .catch(() => toast.error('บันทึกประวัติบทสนทนาไม่สำเร็จ'))
+    }, 250)
+
+    return () => window.clearTimeout(timeout)
+  }, [activeSessionCreatedAt, activeSessionId, messages, sessionsReady])
+
+  const handleSendMessage = (
+    text: string,
+    attachments: PlaygroundAttachment[] = [],
+    webSearch = false
+  ) => {
+    const userMessage = createUserMessage(text, attachments)
     const assistantMessage = createLoadingAssistantMessage()
 
     const newMessages = [...messages, userMessage, assistantMessage]
     updateMessages(newMessages)
 
     // Send chat request
-    sendChat(newMessages)
+    sendChat(newMessages, { webSearch })
   }
 
   const handleCopyMessage = (message: MessageType) => {
@@ -197,11 +254,40 @@ export function Playground() {
     }
     setEditingMessageKey(null)
     clearMessages()
+    setActiveSessionId(createPlaygroundSessionId())
+    setActiveSessionCreatedAt(Date.now())
   }
 
+  const handleSelectSession = (session: PlaygroundSession) => {
+    if (session.id === activeSessionId) return
+    if (isGenerating) stopGeneration()
+    setEditingMessageKey(null)
+    updateMessages(session.messages)
+    setActiveSessionId(session.id)
+    setActiveSessionCreatedAt(session.createdAt)
+  }
+
+  const handleDeleteSession = (sessionId: string) => {
+    if (isGenerating) return
+    void deletePlaygroundSession(sessionId)
+      .then((items) => {
+        setSessions(items)
+        if (sessionId === activeSessionId) handleNewChat()
+      })
+      .catch(() => toast.error('ลบบทสนทนาไม่สำเร็จ'))
+  }
+
+  const formatSessionTime = (timestamp: number) =>
+    new Intl.DateTimeFormat('th-TH', {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(timestamp)
+
   return (
-    <div className='relative flex size-full overflow-hidden bg-background'>
-      <aside className='hidden w-72 shrink-0 flex-col border-r bg-background/95 md:flex'>
+    <div className='bg-background relative flex size-full overflow-hidden'>
+      <aside className='bg-background/95 hidden w-72 shrink-0 flex-col border-r md:flex'>
         <div className='flex h-16 items-center justify-between border-b px-5'>
           <div className='text-base font-semibold'>บทสนทนา</div>
           <Button
@@ -213,11 +299,49 @@ export function Playground() {
             ใหม่
           </Button>
         </div>
-        <div className='flex flex-1 flex-col items-center justify-center gap-2 px-5 text-center text-sm text-muted-foreground'>
-          <MessageSquareText className='size-5 opacity-50' />
-          <p>ยังไม่มีบทสนทนา</p>
-        </div>
-        <div className='border-t px-5 py-4 text-xs text-muted-foreground'>
+        {sessions.length === 0 ? (
+          <div className='text-muted-foreground flex flex-1 flex-col items-center justify-center gap-2 px-5 text-center text-sm'>
+            <MessageSquareText className='size-5 opacity-50' />
+            <p>ยังไม่มีบทสนทนา</p>
+          </div>
+        ) : (
+          <div className='flex-1 space-y-2 overflow-y-auto p-3'>
+            {sessions.map((session) => (
+              <div
+                className={
+                  session.id === activeSessionId
+                    ? 'bg-muted flex items-center rounded-md border'
+                    : 'hover:bg-muted/60 flex items-center rounded-md border border-transparent'
+                }
+                key={session.id}
+              >
+                <button
+                  className='min-w-0 flex-1 px-3 py-2.5 text-left'
+                  onClick={() => handleSelectSession(session)}
+                  type='button'
+                >
+                  <span className='block truncate text-sm font-medium'>
+                    {session.title}
+                  </span>
+                  <span className='text-muted-foreground block text-xs'>
+                    {formatSessionTime(session.updatedAt)}
+                  </span>
+                </button>
+                <Button
+                  aria-label={`ลบบทสนทนา ${session.title}`}
+                  className='mr-1 size-8 shrink-0'
+                  disabled={isGenerating}
+                  onClick={() => handleDeleteSession(session.id)}
+                  size='icon'
+                  variant='ghost'
+                >
+                  <Trash2 className='size-4' />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className='text-muted-foreground border-t px-5 py-4 text-xs'>
           <div className='flex items-center justify-between'>
             <span>เครดิตคงเหลือ</span>
             <span className='font-semibold text-emerald-600'>พร้อมใช้งาน</span>

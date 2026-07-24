@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useEffect, useMemo, useState } from 'react'
-import { Bot, Sparkles } from 'lucide-react'
+import { Bot, FileText, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -114,7 +114,7 @@ export function PlaygroundChat({
                 <h1 className='bg-gradient-to-r from-violet-600 via-fuchsia-500 to-orange-500 bg-clip-text text-3xl font-bold text-transparent md:text-4xl'>
                   ถามอะไรกับ TinyAPI ก็ได้
                 </h1>
-                <p className='mx-auto max-w-xl text-sm text-muted-foreground md:text-base'>
+                <p className='text-muted-foreground mx-auto max-w-xl text-sm md:text-base'>
                   เลือกโมเดล เลือกกลุ่ม แล้วเริ่มทดสอบคำตอบจาก API ได้ทันที
                 </p>
               </div>
@@ -126,7 +126,7 @@ export function PlaygroundChat({
                   'ช่วยตรวจ prompt นี้ให้ตอบดีขึ้น',
                 ].map((item) => (
                   <div
-                    className='flex items-center gap-2 rounded-xl border bg-background px-4 py-3 text-left text-sm text-muted-foreground shadow-sm'
+                    className='bg-background text-muted-foreground flex items-center gap-2 rounded-xl border px-4 py-3 text-left text-sm shadow-sm'
                     key={item}
                   >
                     <Sparkles className='size-4 shrink-0 text-violet-500' />
@@ -206,6 +206,7 @@ export function PlaygroundChat({
                                 (message.from === MESSAGE_ROLES.USER ||
                                   !message.isReasoningStreaming) &&
                                 !!version.content
+                              const attachments = message.attachments || []
 
                               // Extract visible content (remove <think> tags for assistant messages)
                               const displayContent = isAssistant
@@ -280,7 +281,8 @@ export function PlaygroundChat({
                                       {actions}
                                     </>
                                   ) : (
-                                    showMessageContent && (
+                                    (showMessageContent ||
+                                      attachments.length > 0) && (
                                       <>
                                         <MessageContent
                                           variant='flat'
@@ -288,7 +290,43 @@ export function PlaygroundChat({
                                             getMessageContentStyles()
                                           )}
                                         >
-                                          <Response>{displayContent}</Response>
+                                          {attachments.length > 0 && (
+                                            <div className='mb-2 flex flex-wrap gap-2'>
+                                              {attachments.map((attachment) =>
+                                                attachment.mediaType.startsWith(
+                                                  'image/'
+                                                ) ? (
+                                                  <a
+                                                    href={attachment.dataUrl}
+                                                    key={attachment.id}
+                                                    rel='noreferrer'
+                                                    target='_blank'
+                                                  >
+                                                    <img
+                                                      alt={attachment.filename}
+                                                      className='max-h-48 max-w-64 rounded-md border object-contain'
+                                                      src={attachment.dataUrl}
+                                                    />
+                                                  </a>
+                                                ) : (
+                                                  <div
+                                                    className='bg-background/70 flex max-w-64 items-center gap-2 rounded-md border px-3 py-2 text-xs'
+                                                    key={attachment.id}
+                                                  >
+                                                    <FileText className='size-4 shrink-0' />
+                                                    <span className='truncate'>
+                                                      {attachment.filename}
+                                                    </span>
+                                                  </div>
+                                                )
+                                              )}
+                                            </div>
+                                          )}
+                                          {displayContent && (
+                                            <Response>
+                                              {displayContent}
+                                            </Response>
+                                          )}
                                         </MessageContent>
                                         {actions}
                                       </>

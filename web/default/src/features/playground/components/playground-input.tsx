@@ -16,12 +16,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useState } from 'react'
+import { type ChangeEvent, useEffect, useRef, useState } from 'react'
+import type { FileUIPart } from 'ai'
 import {
   PaperclipIcon,
   FileIcon,
   ImageIcon,
-  ScreenShareIcon,
   CameraIcon,
   GlobeIcon,
   SendIcon,
@@ -42,18 +42,26 @@ import {
 } from '@/components/ui/dropdown-menu'
 import {
   PromptInput,
+  PromptInputAttachment,
+  PromptInputAttachments,
   PromptInputButton,
   PromptInputFooter,
+  PromptInputHeader,
   PromptInputTextarea,
   PromptInputTools,
   type PromptInputMessage,
+  usePromptInputAttachments,
 } from '@/components/ai-elements/prompt-input'
 import { Suggestion, Suggestions } from '@/components/ai-elements/suggestion'
 import { ModelGroupSelector } from '@/components/model-group-selector'
-import type { ModelOption, GroupOption } from '../types'
+import type { ModelOption, GroupOption, PlaygroundAttachment } from '../types'
 
 interface PlaygroundInputProps {
-  onSubmit: (text: string) => void
+  onSubmit: (
+    text: string,
+    attachments?: PlaygroundAttachment[],
+    webSearch?: boolean
+  ) => void
   onStop?: () => void
   disabled?: boolean
   isGenerating?: boolean
@@ -75,6 +83,120 @@ const suggestions = [
   { icon: null, text: 'เพิ่มเติม' },
 ]
 
+const MAX_FILES = 4
+const MAX_FILE_SIZE = 8 * 1024 * 1024
+
+function toPlaygroundAttachment(
+  file: FileUIPart,
+  index: number
+): PlaygroundAttachment | null {
+  if (!file.url) return null
+
+  return {
+    id: `${Date.now()}-${index}`,
+    filename: file.filename || `ไฟล์แนบ-${index + 1}`,
+    mediaType: file.mediaType || 'application/octet-stream',
+    dataUrl: file.url,
+  }
+}
+
+interface AttachmentControlsProps {
+  disabled?: boolean
+  onCountChange: (count: number) => void
+}
+
+function AttachmentControls({
+  disabled,
+  onCountChange,
+}: AttachmentControlsProps) {
+  const { t } = useTranslation()
+  const attachments = usePromptInputAttachments()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const photoInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    onCountChange(attachments.files.length)
+  }, [attachments.files.length, onCountChange])
+
+  useEffect(() => {
+    const handleGlobalPaste = (event: ClipboardEvent) => {
+      if (event.defaultPrevented || !event.clipboardData?.files.length) return
+
+      event.preventDefault()
+      attachments.add(event.clipboardData.files)
+    }
+
+    document.addEventListener('paste', handleGlobalPaste)
+    return () => document.removeEventListener('paste', handleGlobalPaste)
+  }, [attachments])
+
+  const addFiles = (event: ChangeEvent<HTMLInputElement>) => {
+    if (event.currentTarget.files?.length) {
+      attachments.add(event.currentTarget.files)
+    }
+    event.currentTarget.value = ''
+  }
+
+  return (
+    <>
+      <input
+        className='hidden'
+        multiple
+        onChange={addFiles}
+        ref={fileInputRef}
+        type='file'
+      />
+      <input
+        accept='image/*'
+        className='hidden'
+        multiple
+        onChange={addFiles}
+        ref={photoInputRef}
+        type='file'
+      />
+      <input
+        accept='image/*'
+        capture='environment'
+        className='hidden'
+        onChange={addFiles}
+        ref={cameraInputRef}
+        type='file'
+      />
+
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <PromptInputButton
+              className='border font-medium'
+              disabled={disabled}
+              variant='outline'
+            />
+          }
+        >
+          <PaperclipIcon size={16} />
+          <span className='hidden sm:inline'>{t('Attach')}</span>
+          <span className='sr-only sm:hidden'>{t('Attach')}</span>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align='start'>
+          <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
+            <FileIcon className='mr-2' size={16} />
+            {t('Upload file')}
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => photoInputRef.current?.click()}>
+            <ImageIcon className='mr-2' size={16} />
+            {t('Upload photo')}
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => cameraInputRef.current?.click()}>
+            <CameraIcon className='mr-2' size={16} />
+            {t('Take photo')}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
+  )
+}
+
 export function PlaygroundInput({
   onSubmit,
   onStop,
@@ -90,21 +212,26 @@ export function PlaygroundInput({
 }: PlaygroundInputProps) {
   const { t } = useTranslation()
   const [text, setText] = useState('')
+  const [attachmentCount, setAttachmentCount] = useState(0)
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false)
 
   const isModelSelectDisabled =
     disabled || isModelLoading || models.length === 0
   const isGroupSelectDisabled = disabled || groups.length === 0
 
   const handleSubmit = (message: PromptInputMessage) => {
-    if (!message.text?.trim() || disabled) return
-    onSubmit(message.text)
+    if ((!message.text?.trim() && !message.files?.length) || disabled) return
+    const attachments = (message.files || [])
+      .map(toPlaygroundAttachment)
+      .filter(
+        (attachment): attachment is PlaygroundAttachment => attachment !== null
+      )
+    onSubmit(
+      message.text?.trim() || 'ช่วยวิเคราะห์ไฟล์ที่แนบมา',
+      attachments,
+      webSearchEnabled
+    )
     setText('')
-  }
-
-  const handleFileAction = (action: string) => {
-    toast.info(t('Feature in development'), {
-      description: action,
-    })
   }
 
   const handleSuggestionClick = (suggestion: string) => {
@@ -113,7 +240,22 @@ export function PlaygroundInput({
 
   return (
     <div className='grid shrink-0 gap-4 px-1 md:pb-4'>
-      <PromptInput groupClassName='rounded-xl' onSubmit={handleSubmit}>
+      <PromptInput
+        globalDrop
+        groupClassName='rounded-xl'
+        maxFiles={MAX_FILES}
+        maxFileSize={MAX_FILE_SIZE}
+        multiple
+        onError={(error) => toast.error(error.message)}
+        onSubmit={handleSubmit}
+      >
+        <PromptInputHeader className='px-3 pt-3'>
+          <PromptInputAttachments>
+            {(attachment) => (
+              <PromptInputAttachment className='max-w-56' data={attachment} />
+            )}
+          </PromptInputAttachments>
+        </PromptInputHeader>
         <PromptInputTextarea
           autoComplete='off'
           autoCorrect='off'
@@ -128,52 +270,26 @@ export function PlaygroundInput({
 
         <PromptInputFooter className='p-2.5'>
           <PromptInputTools>
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <PromptInputButton
-                    className='border font-medium'
-                    disabled={disabled}
-                    variant='outline'
-                  />
-                }
-              >
-                <PaperclipIcon size={16} />
-                <span className='hidden sm:inline'>{t('Attach')}</span>
-                <span className='sr-only sm:hidden'>{t('Attach')}</span>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align='start'>
-                <DropdownMenuItem
-                  onClick={() => handleFileAction('upload-file')}
-                >
-                  <FileIcon className='mr-2' size={16} />
-                  {t('Upload file')}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => handleFileAction('upload-photo')}
-                >
-                  <ImageIcon className='mr-2' size={16} />
-                  {t('Upload photo')}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => handleFileAction('take-screenshot')}
-                >
-                  <ScreenShareIcon className='mr-2' size={16} />
-                  {t('Take screenshot')}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => handleFileAction('take-photo')}
-                >
-                  <CameraIcon className='mr-2' size={16} />
-                  {t('Take photo')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <AttachmentControls
+              disabled={disabled}
+              onCountChange={setAttachmentCount}
+            />
 
             <PromptInputButton
-              className='border font-medium'
+              aria-pressed={webSearchEnabled}
+              className={
+                webSearchEnabled
+                  ? 'border border-sky-500 bg-sky-50 font-medium text-sky-700 hover:bg-sky-100 dark:bg-sky-950 dark:text-sky-300'
+                  : 'border font-medium'
+              }
               disabled={disabled}
-              onClick={() => toast.info(t('Search feature in development'))}
+              onClick={() => setWebSearchEnabled((enabled) => !enabled)}
+              title={
+                webSearchEnabled
+                  ? 'ปิดการค้นหาเว็บ'
+                  : 'เปิดการค้นหาเว็บสำหรับคำขอถัดไป'
+              }
+              type='button'
               variant='outline'
             >
               <GlobeIcon size={16} />
@@ -206,7 +322,7 @@ export function PlaygroundInput({
             ) : (
               <PromptInputButton
                 className='text-foreground font-medium'
-                disabled={disabled || !text.trim()}
+                disabled={disabled || (!text.trim() && attachmentCount === 0)}
                 type='submit'
                 variant='secondary'
               >

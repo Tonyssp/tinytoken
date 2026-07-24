@@ -103,11 +103,12 @@ export function useChatHandler({
 
   // Send streaming chat request
   const sendStreamingChat = useCallback(
-    (messages: Message[]) => {
+    (messages: Message[], webSearch = false) => {
       const payload = buildChatCompletionPayload(
         messages,
         config,
-        parameterEnabled
+        parameterEnabled,
+        webSearch
       )
       sendStreamRequest(
         payload,
@@ -128,11 +129,12 @@ export function useChatHandler({
 
   // Send non-streaming chat request
   const sendNonStreamingChat = useCallback(
-    async (messages: Message[]) => {
+    async (messages: Message[], webSearch = false) => {
       const payload = buildChatCompletionPayload(
         messages,
         config,
-        parameterEnabled
+        parameterEnabled,
+        webSearch
       )
 
       try {
@@ -177,11 +179,12 @@ export function useChatHandler({
 
   // Send chat request (stream or non-stream based on config)
   const sendChat = useCallback(
-    (messages: Message[]) => {
+    (messages: Message[], options?: { webSearch?: boolean }) => {
+      const webSearch = options?.webSearch ?? false
       if (config.stream) {
-        sendStreamingChat(messages)
+        sendStreamingChat(messages, webSearch)
       } else {
-        sendNonStreamingChat(messages)
+        sendNonStreamingChat(messages, webSearch)
       }
     },
     [config.stream, sendStreamingChat, sendNonStreamingChat]
