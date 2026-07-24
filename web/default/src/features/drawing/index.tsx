@@ -43,7 +43,6 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
-import { Dialog } from '@/components/dialog'
 import {
   Select,
   SelectContent,
@@ -52,6 +51,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { Dialog } from '@/components/dialog'
 import { ModelGroupSelector } from '@/components/model-group-selector'
 import { getUserGroups, getUserModels } from '@/features/playground/api'
 import type { GroupOption, ModelOption } from '@/features/playground/types'
@@ -110,6 +110,52 @@ function getImageSrc(result: DrawingResult) {
   return ''
 }
 
+function getSessionPrompt(turns: GenerationTurn[], prompt: string) {
+  const previousPrompts = turns
+    .filter((turn) => turn.status === 'success' && turn.results.length > 0)
+    .slice(-3)
+    .map((turn) => turn.prompt.trim())
+    .filter(Boolean)
+
+  if (previousPrompts.length === 0) return prompt
+
+  return [
+    'Continue the same visual subject, identity, style, and details from the previous image in this conversation.',
+    'Previous requests:',
+    ...previousPrompts.map((item, index) => `${index + 1}. ${item}`),
+    'Current request:',
+    prompt,
+  ].join('\n')
+}
+
+async function drawingResultToFile(result: DrawingResult) {
+  try {
+    if (result.b64) {
+      const encoded = result.b64.includes(',')
+        ? result.b64.slice(result.b64.indexOf(',') + 1)
+        : result.b64
+      const binary = window.atob(encoded)
+      const bytes = new Uint8Array(binary.length)
+      for (let index = 0; index < binary.length; index += 1) {
+        bytes[index] = binary.charCodeAt(index)
+      }
+      return new File([bytes], 'session-reference.png', { type: 'image/png' })
+    }
+
+    if (!result.url) return null
+
+    const response = await fetch(result.url)
+    if (!response.ok) return null
+    const blob = await response.blob()
+    if (!blob.type.startsWith('image/')) return null
+    return new File([blob], 'session-reference.png', {
+      type: blob.type || 'image/png',
+    })
+  } catch {
+    return null
+  }
+}
+
 function getRequestId(message: string) {
   return message.match(/request(?:_ori)?_id:\s*([A-Za-z0-9-]+)/i)?.[1] || ''
 }
@@ -122,12 +168,36 @@ function getDrawingErrorMessage(error: unknown) {
     error as {
       response?: {
         status?: number
-        data?: { error?: { message?: string }; message?: string }
+        data?: {
+          error?: { code?: string; message?: string; type?: string }
+          code?: string
+          message?: string
+        }
       }
     }
   ).response
+  const errorCode = String(
+    response?.data?.error?.code || response?.data?.code || ''
+  )
   const upstreamMessage =
     response?.data?.error?.message || response?.data?.message
+  const rawMessage =
+    upstreamMessage || (error instanceof Error ? error.message : '')
+  const normalizedError = `${errorCode} ${rawMessage}`.toLowerCase()
+
+  if (
+    errorCode === 'insufficient_user_quota' ||
+    normalizedError.includes('insufficient_user_quota') ||
+    normalizedError.includes('quota is not enough') ||
+    normalizedError.includes('insufficient quota') ||
+    normalizedError.includes('insufficient credit') ||
+    normalizedError.includes('insufficient balance') ||
+    normalizedError.includes('เครดิตไม่เพียงพอ') ||
+    normalizedError.includes('余额不足') ||
+    normalizedError.includes('额度不足')
+  ) {
+    return 'เครดิตคุณไม่พอ กรุณาเติมเครดิต'
+  }
 
   if (response?.status === 503) {
     return 'กลุ่มที่เลือกไม่มีช่องทางรองรับโมเดลหรือการแก้ไขรูปภาพนี้ กรุณาเลือกกลุ่ม/โมเดลอื่น หรือติดต่อผู้ดูแลให้เปิด endpoint รูปภาพ'
@@ -137,8 +207,6 @@ function getDrawingErrorMessage(error: unknown) {
     return 'บัญชีนี้ไม่มีสิทธิ์ใช้โมเดลหรือกลุ่มที่เลือก'
   }
 
-  const rawMessage =
-    upstreamMessage || (error instanceof Error ? error.message : '')
   const requestId = getRequestId(rawMessage)
   const requestIdSuffix = requestId ? ` (Request ID: ${requestId})` : ''
 
@@ -190,6 +258,7 @@ export function Drawing() {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const turnReferenceUrlsRef = useRef<string[]>([])
   const dragDepthRef = useRef(0)
+  const generationLockRef = useRef(false)
 
   const selectedModelExists = useMemo(
     () => models.some((model) => model.value === selectedModel),
@@ -435,6 +504,7 @@ export function Drawing() {
   const handleGenerate = useCallback(async () => {
     const cleanPrompt = prompt.trim()
 
+    if (generationLockRef.current || loading) return
     if (!cleanPrompt) {
       toast.error('กรุณาใส่พรอมป์สำหรับสร้างรูปภาพ')
       return
@@ -444,19 +514,37 @@ export function Drawing() {
       return
     }
 
+    generationLockRef.current = true
+    const latestSuccessfulTurn = [...turns]
+      .reverse()
+      .find((turn) => turn.status === 'success' && turn.results.length > 0)
+    const latestResult = latestSuccessfulTurn?.results.at(-1)
+    const automaticReference =
+      !referenceImage && latestResult
+        ? await drawingResultToFile(latestResult)
+        : null
+    const submittedReference = referenceImage || automaticReference
+    const usesSessionMemory = !referenceImage && Boolean(automaticReference)
+    const submittedPrompt = getSessionPrompt(turns, cleanPrompt)
     const requestedCount = Math.max(1, Number(count) || 1)
     const turnId = createDrawingId()
     const turnReferenceUrl = referenceImage
       ? URL.createObjectURL(referenceImage)
-      : undefined
-    if (turnReferenceUrl) turnReferenceUrlsRef.current.push(turnReferenceUrl)
+      : usesSessionMemory && latestResult
+        ? getImageSrc(latestResult)
+        : undefined
+    if (referenceImage && turnReferenceUrl) {
+      turnReferenceUrlsRef.current.push(turnReferenceUrl)
+    }
 
     setTurns((previous) => [
       ...previous,
       {
         id: turnId,
         prompt: cleanPrompt,
-        referenceName: referenceImage?.name,
+        referenceName:
+          referenceImage?.name ||
+          (usesSessionMemory ? 'รูปจากบทสนทนาก่อนหน้า' : undefined),
         referenceUrl: turnReferenceUrl,
         referenceBlob: referenceImage || undefined,
         results: [],
@@ -466,7 +554,6 @@ export function Drawing() {
       },
     ])
 
-    const submittedReference = referenceImage
     setPrompt('')
     setReferenceFile(null)
 
@@ -486,7 +573,7 @@ export function Drawing() {
         const generated = await generateImage({
           group: selectedGroup,
           model: selectedModel,
-          prompt: cleanPrompt,
+          prompt: submittedPrompt,
           size,
           quality,
           count: 1,
@@ -541,9 +628,11 @@ export function Drawing() {
     } finally {
       setGenerationProgress(null)
       setLoading(false)
+      generationLockRef.current = false
     }
   }, [
     count,
+    loading,
     prompt,
     quality,
     referenceImage,
@@ -551,6 +640,7 @@ export function Drawing() {
     selectedGroup,
     setReferenceFile,
     size,
+    turns,
   ])
 
   return (
