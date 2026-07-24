@@ -36,7 +36,7 @@ type OpenAIImageResponse = {
 }
 
 export type GenerateImagePayload = {
-  token: string
+  group: string
   model: string
   prompt: string
   size: string
@@ -60,12 +60,9 @@ function mapImageResponse(data: OpenAIImageResponse): DrawingResult[] {
 export async function generateImage(
   payload: GenerateImagePayload
 ): Promise<DrawingResult[]> {
-  const headers = {
-    Authorization: `Bearer ${payload.token}`,
-  }
-
   if (payload.referenceImage) {
     const form = new FormData()
+    form.append('group', payload.group)
     form.append('model', payload.model)
     form.append('prompt', payload.prompt)
     form.append('image', payload.referenceImage)
@@ -77,14 +74,14 @@ export async function generateImage(
       form.append('quality', payload.quality)
     }
 
-    const res = await api.post<OpenAIImageResponse>('/v1/images/edits', form, {
-      headers,
+    const res = await api.post<OpenAIImageResponse>('/pg/images/edits', form, {
       skipErrorHandler: true,
     } as Record<string, unknown>)
     return mapImageResponse(res.data)
   }
 
   const body: Record<string, unknown> = {
+    group: payload.group,
     model: payload.model,
     prompt: payload.prompt,
     n: payload.count,
@@ -97,10 +94,9 @@ export async function generateImage(
   }
 
   const res = await api.post<OpenAIImageResponse>(
-    '/v1/images/generations',
+    '/pg/images/generations',
     body,
     {
-      headers,
       skipErrorHandler: true,
     } as Record<string, unknown>
   )
