@@ -43,6 +43,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
+import { Dialog } from '@/components/dialog'
 import {
   Select,
   SelectContent,
@@ -178,6 +179,10 @@ export function Drawing() {
   const [sessionsReady, setSessionsReady] = useState(false)
   const [loading, setLoading] = useState(false)
   const [dragActive, setDragActive] = useState(false)
+  const [previewImage, setPreviewImage] = useState<{
+    src: string
+    alt: string
+  } | null>(null)
   const [generationProgress, setGenerationProgress] = useState<{
     current: number
     total: number
@@ -803,6 +808,10 @@ export function Drawing() {
                     <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-3'>
                       {turn.results.map((result) => {
                         const src = getImageSrc(result)
+                        const imageAlt =
+                          result.revisedPrompt ||
+                          turn.prompt ||
+                          'รูปภาพที่สร้างขึ้น'
                         return (
                           <Card
                             key={result.id}
@@ -812,11 +821,7 @@ export function Drawing() {
                               {src ? (
                                 <img
                                   src={src}
-                                  alt={
-                                    result.revisedPrompt ||
-                                    turn.prompt ||
-                                    'รูปภาพที่สร้างขึ้น'
-                                  }
+                                  alt={imageAlt}
                                   className='size-full object-cover'
                                 />
                               ) : (
@@ -836,12 +841,8 @@ export function Drawing() {
                                   variant='outline'
                                   size='sm'
                                   disabled={!src}
-                                  render={
-                                    <a
-                                      href={src}
-                                      target='_blank'
-                                      rel='noreferrer'
-                                    />
+                                  onClick={() =>
+                                    setPreviewImage({ src, alt: imageAlt })
                                   }
                                 >
                                   <Eye className='size-4' />
@@ -958,6 +959,39 @@ export function Drawing() {
           </div>
         </div>
       </main>
+
+      <Dialog
+        open={Boolean(previewImage)}
+        onOpenChange={(open) => {
+          if (!open) setPreviewImage(null)
+        }}
+        title='ตัวอย่างรูปภาพ'
+        description='ตรวจสอบรูปภาพขนาดเต็มภายในหน้าเว็บ'
+        contentClassName='sm:max-w-5xl'
+        contentHeight='min(76vh, 760px)'
+        bodyClassName='flex h-full items-center justify-center rounded-lg bg-muted/30 p-2'
+        footer={
+          previewImage ? (
+            <Button
+              variant='outline'
+              render={
+                <a href={previewImage.src} download='tinyapi-drawing.png' />
+              }
+            >
+              <Download className='size-4' />
+              ดาวน์โหลด
+            </Button>
+          ) : null
+        }
+      >
+        {previewImage ? (
+          <img
+            src={previewImage.src}
+            alt={previewImage.alt}
+            className='max-h-full max-w-full object-contain'
+          />
+        ) : null}
+      </Dialog>
     </div>
   )
 }
