@@ -18,10 +18,18 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useCallback, useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { MessageSquareText, Plus, Trash2 } from 'lucide-react'
+import { MessageSquareText, PanelLeftOpen, Plus, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet'
 import { getUserModels, getUserGroups } from './api'
 import { PlaygroundChat } from './components/playground-chat'
 import { PlaygroundInput } from './components/playground-input'
@@ -35,10 +43,7 @@ import {
   savePlaygroundSession,
   type PlaygroundSession,
 } from './lib'
-import type {
-  Message as MessageType,
-  PlaygroundAttachment,
-} from './types'
+import type { Message as MessageType, PlaygroundAttachment } from './types'
 
 export function Playground() {
   const { t } = useTranslation()
@@ -68,6 +73,7 @@ export function Playground() {
     Date.now()
   )
   const [sessionsReady, setSessionsReady] = useState(false)
+  const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false)
 
   // Edit dialog state
   const [editingMessageKey, setEditingMessageKey] = useState<string | null>(
@@ -256,6 +262,7 @@ export function Playground() {
     clearMessages()
     setActiveSessionId(createPlaygroundSessionId())
     setActiveSessionCreatedAt(Date.now())
+    setMobileHistoryOpen(false)
   }
 
   const handleSelectSession = (session: PlaygroundSession) => {
@@ -265,6 +272,7 @@ export function Playground() {
     updateMessages(session.messages)
     setActiveSessionId(session.id)
     setActiveSessionCreatedAt(session.createdAt)
+    setMobileHistoryOpen(false)
   }
 
   const handleDeleteSession = (sessionId: string) => {
@@ -285,11 +293,11 @@ export function Playground() {
       minute: '2-digit',
     }).format(timestamp)
 
-  return (
-    <div className='bg-background relative flex size-full overflow-hidden'>
-      <aside className='bg-background/95 hidden w-72 shrink-0 flex-col border-r md:flex'>
-        <div className='flex h-16 items-center justify-between border-b px-5'>
-          <div className='text-base font-semibold'>บทสนทนา</div>
+  const renderSessionHistory = (showClose = false) => (
+    <>
+      <div className='flex h-16 shrink-0 items-center justify-between border-b px-5'>
+        <div className='text-base font-semibold'>บทสนทนา</div>
+        <div className='flex items-center gap-1'>
           <Button
             className='gap-1.5 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-4 text-white shadow-sm hover:from-violet-600 hover:to-fuchsia-600'
             onClick={handleNewChat}
@@ -298,60 +306,107 @@ export function Playground() {
             <Plus className='size-4' />
             ใหม่
           </Button>
-        </div>
-        {sessions.length === 0 ? (
-          <div className='text-muted-foreground flex flex-1 flex-col items-center justify-center gap-2 px-5 text-center text-sm'>
-            <MessageSquareText className='size-5 opacity-50' />
-            <p>ยังไม่มีบทสนทนา</p>
-          </div>
-        ) : (
-          <div className='flex-1 space-y-2 overflow-y-auto p-3'>
-            {sessions.map((session) => (
-              <div
-                className={
-                  session.id === activeSessionId
-                    ? 'bg-muted flex items-center rounded-md border'
-                    : 'hover:bg-muted/60 flex items-center rounded-md border border-transparent'
-                }
-                key={session.id}
-              >
-                <button
-                  className='min-w-0 flex-1 px-3 py-2.5 text-left'
-                  onClick={() => handleSelectSession(session)}
-                  type='button'
-                >
-                  <span className='block truncate text-sm font-medium'>
-                    {session.title}
-                  </span>
-                  <span className='text-muted-foreground block text-xs'>
-                    {formatSessionTime(session.updatedAt)}
-                  </span>
-                </button>
+          {showClose && (
+            <SheetClose
+              render={
                 <Button
-                  aria-label={`ลบบทสนทนา ${session.title}`}
-                  className='mr-1 size-8 shrink-0'
-                  disabled={isGenerating}
-                  onClick={() => handleDeleteSession(session.id)}
+                  aria-label='ปิดประวัติบทสนทนา'
+                  className='size-8'
                   size='icon'
                   variant='ghost'
-                >
-                  <Trash2 className='size-4' />
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className='text-muted-foreground border-t px-5 py-4 text-xs'>
-          <div className='flex items-center justify-between'>
-            <span>เครดิตคงเหลือ</span>
-            <span className='font-semibold text-emerald-600'>พร้อมใช้งาน</span>
-          </div>
+                />
+              }
+            >
+              <X className='size-4' />
+            </SheetClose>
+          )}
         </div>
+      </div>
+      {sessions.length === 0 ? (
+        <div className='text-muted-foreground flex flex-1 flex-col items-center justify-center gap-2 px-5 text-center text-sm'>
+          <MessageSquareText className='size-5 opacity-50' />
+          <p>ยังไม่มีบทสนทนา</p>
+        </div>
+      ) : (
+        <div className='flex-1 space-y-2 overflow-y-auto p-3'>
+          {sessions.map((session) => (
+            <div
+              className={
+                session.id === activeSessionId
+                  ? 'bg-muted flex items-center rounded-md border'
+                  : 'hover:bg-muted/60 flex items-center rounded-md border border-transparent'
+              }
+              key={session.id}
+            >
+              <button
+                className='min-w-0 flex-1 px-3 py-2.5 text-left'
+                onClick={() => handleSelectSession(session)}
+                type='button'
+              >
+                <span className='block truncate text-sm font-medium'>
+                  {session.title}
+                </span>
+                <span className='text-muted-foreground block text-xs'>
+                  {formatSessionTime(session.updatedAt)}
+                </span>
+              </button>
+              <Button
+                aria-label={`ลบบทสนทนา ${session.title}`}
+                className='mr-1 size-8 shrink-0'
+                disabled={isGenerating}
+                onClick={() => handleDeleteSession(session.id)}
+                size='icon'
+                variant='ghost'
+              >
+                <Trash2 className='size-4' />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className='text-muted-foreground border-t px-5 py-4 text-xs'>
+        <div className='flex items-center justify-between'>
+          <span>เครดิตคงเหลือ</span>
+          <span className='font-semibold text-emerald-600'>พร้อมใช้งาน</span>
+        </div>
+      </div>
+    </>
+  )
+
+  return (
+    <div className='bg-background relative flex size-full overflow-hidden'>
+      <aside className='bg-background/95 hidden w-72 shrink-0 flex-col border-r md:flex'>
+        {renderSessionHistory()}
       </aside>
 
       <div className='flex min-w-0 flex-1 flex-col overflow-hidden'>
-        <div className='flex h-14 items-center justify-between border-b px-4 md:hidden'>
-          <div className='font-semibold'>บทสนทนา</div>
+        <div className='flex h-14 items-center justify-between border-b px-3 md:hidden'>
+          <Sheet open={mobileHistoryOpen} onOpenChange={setMobileHistoryOpen}>
+            <SheetTrigger
+              render={
+                <Button
+                  aria-label='เปิดประวัติบทสนทนา'
+                  className='size-9'
+                  size='icon'
+                  title='ประวัติบทสนทนา'
+                  variant='outline'
+                />
+              }
+            >
+              <PanelLeftOpen className='size-4' />
+            </SheetTrigger>
+            <SheetContent
+              className='w-[min(88vw,320px)] gap-0 p-0'
+              side='left'
+              showCloseButton={false}
+            >
+              <SheetHeader className='sr-only'>
+                <SheetTitle>ประวัติบทสนทนา</SheetTitle>
+              </SheetHeader>
+              {renderSessionHistory(true)}
+            </SheetContent>
+          </Sheet>
+          <div className='font-semibold'>แชท</div>
           <Button className='gap-1.5 rounded-full' onClick={handleNewChat}>
             <Plus className='size-4' />
             ใหม่

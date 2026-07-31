@@ -33,6 +33,7 @@ import {
   Loader2,
   MessageSquareText,
   Paintbrush,
+  PanelLeftOpen,
   Plus,
   Sparkles,
   Trash2,
@@ -50,6 +51,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog } from '@/components/dialog'
 import { ModelGroupSelector } from '@/components/model-group-selector'
@@ -245,6 +253,7 @@ export function Drawing() {
     Date.now()
   )
   const [sessionsReady, setSessionsReady] = useState(false)
+  const [mobilePanelOpen, setMobilePanelOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   const [previewImage, setPreviewImage] = useState<{
@@ -446,6 +455,7 @@ export function Drawing() {
     setTurns([])
     setActiveSessionId(createDrawingId())
     setActiveSessionCreatedAt(Date.now())
+    setMobilePanelOpen(false)
   }, [loading, releaseTurnReferenceUrls, setReferenceFile])
 
   const selectSession = useCallback(
@@ -474,6 +484,7 @@ export function Drawing() {
       setTurns(restoredTurns)
       setActiveSessionId(session.id)
       setActiveSessionCreatedAt(session.createdAt)
+      setMobilePanelOpen(false)
     },
     [activeSessionId, loading, releaseTurnReferenceUrls, setReferenceFile]
   )
@@ -643,6 +654,174 @@ export function Drawing() {
     turns,
   ])
 
+  const renderDrawingSettings = () => (
+    <div className='shrink-0 border-b p-3'>
+      <Card className='rounded-xl shadow-sm'>
+        <CardHeader className='space-y-2'>
+          <div className='flex items-center gap-2'>
+            <div className='bg-primary text-primary-foreground flex size-10 items-center justify-center rounded-xl'>
+              <Paintbrush className='size-5' />
+            </div>
+            <div>
+              <CardTitle>การสร้างรูปภาพ</CardTitle>
+              <p className='text-muted-foreground text-sm'>
+                สร้างรูปภาพด้วย AI
+              </p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className='space-y-5'>
+          <ModelGroupSelector
+            groups={groups}
+            models={models}
+            selectedGroup={selectedGroup}
+            selectedModel={selectedModel}
+            onGroupChange={setSelectedGroup}
+            onModelChange={setSelectedModel}
+            disabled={loading}
+          />
+
+          {!selectedModelExists && (
+            <p className='text-xs text-amber-600'>
+              กลุ่มนี้ยังไม่มีโมเดลสร้างรูปภาพที่บัญชีของคุณใช้งานได้
+            </p>
+          )}
+
+          <div className='grid grid-cols-2 gap-3'>
+            <div className='space-y-2'>
+              <Label>ขนาด</Label>
+              <Select
+                value={size}
+                onValueChange={(value) => value && setSize(value)}
+                disabled={loading}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='auto'>auto</SelectItem>
+                  <SelectItem value='1024x1024'>1024x1024</SelectItem>
+                  <SelectItem value='1536x1024'>1536x1024</SelectItem>
+                  <SelectItem value='1024x1536'>1024x1536</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className='space-y-2'>
+              <Label>คุณภาพ</Label>
+              <Select
+                value={quality}
+                onValueChange={(value) => value && setQuality(value)}
+                disabled={loading}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='auto'>auto</SelectItem>
+                  <SelectItem value='low'>low</SelectItem>
+                  <SelectItem value='medium'>medium</SelectItem>
+                  <SelectItem value='high'>high</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className='space-y-2'>
+            <Label>จำนวนรูปภาพ</Label>
+            <Select
+              value={count}
+              onValueChange={(value) => value && setCount(value)}
+              disabled={loading}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='1'>1</SelectItem>
+                <SelectItem value='2'>2</SelectItem>
+                <SelectItem value='3'>3</SelectItem>
+                <SelectItem value='4'>4</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Button
+            variant='destructive'
+            className='w-full justify-start'
+            onClick={clearHistory}
+            disabled={turns.length === 0 || loading}
+          >
+            <Trash2 className='size-4' />
+            ล้างประวัติ
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  )
+
+  const renderDrawingSessions = () => (
+    <>
+      <div className='flex h-16 shrink-0 items-center justify-between border-b px-4'>
+        <div className='font-semibold'>บทสนทนา</div>
+        <Button
+          className='gap-1.5 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-4 text-white shadow-sm hover:from-violet-600 hover:to-fuchsia-600'
+          onClick={startNewSession}
+          disabled={loading}
+          size='sm'
+        >
+          <Plus className='size-4' />
+          ใหม่
+        </Button>
+      </div>
+
+      <div className='min-h-32 flex-1 overflow-y-auto p-3'>
+        {sessions.length === 0 ? (
+          <div className='text-muted-foreground flex h-full min-h-28 flex-col items-center justify-center gap-2 text-center text-sm'>
+            <MessageSquareText className='size-5 opacity-50' />
+            <p>ยังไม่มีบทสนทนา</p>
+          </div>
+        ) : (
+          <div className='space-y-1.5'>
+            {sessions.map((session) => (
+              <div
+                key={session.id}
+                className={`group flex items-center gap-2 rounded-lg border px-3 py-2 transition-colors ${
+                  session.id === activeSessionId
+                    ? 'border-primary/30 bg-primary/10'
+                    : 'hover:bg-muted border-transparent'
+                }`}
+              >
+                <button
+                  type='button'
+                  className='min-w-0 flex-1 text-left'
+                  onClick={() => selectSession(session)}
+                  disabled={loading}
+                >
+                  <span className='block truncate text-sm font-medium'>
+                    {session.title}
+                  </span>
+                  <span className='text-muted-foreground block text-xs'>
+                    {formatSessionTime(session.updatedAt)}
+                  </span>
+                </button>
+                <Button
+                  variant='ghost'
+                  size='icon'
+                  className='size-8 shrink-0 opacity-60 group-hover:opacity-100 hover:text-red-600'
+                  onClick={() => removeSession(session.id)}
+                  disabled={loading}
+                  aria-label={`ลบบทสนทนา ${session.title}`}
+                >
+                  <Trash2 className='size-4' />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
+  )
+
   return (
     <div
       className='bg-background relative flex h-full min-h-0 w-full flex-1 overflow-hidden'
@@ -667,170 +846,39 @@ export function Drawing() {
       )}
 
       <aside className='bg-muted/20 hidden w-80 shrink-0 flex-col border-r lg:flex'>
-        <div className='max-h-[58%] shrink-0 overflow-y-auto border-b p-3'>
-          <Card className='rounded-xl shadow-sm'>
-            <CardHeader className='space-y-2'>
-              <div className='flex items-center gap-2'>
-                <div className='bg-primary text-primary-foreground flex size-10 items-center justify-center rounded-xl'>
-                  <Paintbrush className='size-5' />
-                </div>
-                <div>
-                  <CardTitle>การสร้างรูปภาพ</CardTitle>
-                  <p className='text-muted-foreground text-sm'>
-                    สร้างรูปภาพด้วย AI
-                  </p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className='space-y-5'>
-              <ModelGroupSelector
-                groups={groups}
-                models={models}
-                selectedGroup={selectedGroup}
-                selectedModel={selectedModel}
-                onGroupChange={setSelectedGroup}
-                onModelChange={setSelectedModel}
-                disabled={loading}
-              />
-
-              {!selectedModelExists && (
-                <p className='text-xs text-amber-600'>
-                  กลุ่มนี้ยังไม่มีโมเดลสร้างรูปภาพที่บัญชีของคุณใช้งานได้
-                </p>
-              )}
-
-              <div className='grid grid-cols-2 gap-3'>
-                <div className='space-y-2'>
-                  <Label>ขนาด</Label>
-                  <Select
-                    value={size}
-                    onValueChange={(value) => value && setSize(value)}
-                    disabled={loading}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value='auto'>auto</SelectItem>
-                      <SelectItem value='1024x1024'>1024x1024</SelectItem>
-                      <SelectItem value='1536x1024'>1536x1024</SelectItem>
-                      <SelectItem value='1024x1536'>1024x1536</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className='space-y-2'>
-                  <Label>คุณภาพ</Label>
-                  <Select
-                    value={quality}
-                    onValueChange={(value) => value && setQuality(value)}
-                    disabled={loading}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value='auto'>auto</SelectItem>
-                      <SelectItem value='low'>low</SelectItem>
-                      <SelectItem value='medium'>medium</SelectItem>
-                      <SelectItem value='high'>high</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className='space-y-2'>
-                <Label>จำนวนรูปภาพ</Label>
-                <Select
-                  value={count}
-                  onValueChange={(value) => value && setCount(value)}
-                  disabled={loading}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='1'>1</SelectItem>
-                    <SelectItem value='2'>2</SelectItem>
-                    <SelectItem value='3'>3</SelectItem>
-                    <SelectItem value='4'>4</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Button
-                variant='destructive'
-                className='w-full justify-start'
-                onClick={clearHistory}
-                disabled={turns.length === 0 || loading}
-              >
-                <Trash2 className='size-4' />
-                ล้างประวัติ
-              </Button>
-            </CardContent>
-          </Card>
+        <div className='max-h-[58%] overflow-y-auto'>
+          {renderDrawingSettings()}
         </div>
-
-        <div className='flex h-16 shrink-0 items-center justify-between border-b px-4'>
-          <div className='font-semibold'>บทสนทนา</div>
-          <Button
-            className='gap-1.5 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-4 text-white shadow-sm hover:from-violet-600 hover:to-fuchsia-600'
-            onClick={startNewSession}
-            disabled={loading}
-            size='sm'
-          >
-            <Plus className='size-4' />
-            ใหม่
-          </Button>
-        </div>
-
-        <div className='min-h-32 flex-1 overflow-y-auto p-3'>
-          {sessions.length === 0 ? (
-            <div className='text-muted-foreground flex h-full min-h-28 flex-col items-center justify-center gap-2 text-center text-sm'>
-              <MessageSquareText className='size-5 opacity-50' />
-              <p>ยังไม่มีบทสนทนา</p>
-            </div>
-          ) : (
-            <div className='space-y-1.5'>
-              {sessions.map((session) => (
-                <div
-                  key={session.id}
-                  className={`group flex items-center gap-2 rounded-lg border px-3 py-2 transition-colors ${
-                    session.id === activeSessionId
-                      ? 'border-primary/30 bg-primary/10'
-                      : 'hover:bg-muted border-transparent'
-                  }`}
-                >
-                  <button
-                    type='button'
-                    className='min-w-0 flex-1 text-left'
-                    onClick={() => selectSession(session)}
-                    disabled={loading}
-                  >
-                    <span className='block truncate text-sm font-medium'>
-                      {session.title}
-                    </span>
-                    <span className='text-muted-foreground block text-xs'>
-                      {formatSessionTime(session.updatedAt)}
-                    </span>
-                  </button>
-                  <Button
-                    variant='ghost'
-                    size='icon'
-                    className='size-8 shrink-0 opacity-60 group-hover:opacity-100 hover:text-red-600'
-                    onClick={() => removeSession(session.id)}
-                    disabled={loading}
-                    aria-label={`ลบบทสนทนา ${session.title}`}
-                  >
-                    <Trash2 className='size-4' />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        {renderDrawingSessions()}
       </aside>
 
       <main className='flex min-h-0 min-w-0 flex-1 flex-col'>
+        <Sheet open={mobilePanelOpen} onOpenChange={setMobilePanelOpen}>
+          <SheetTrigger
+            render={
+              <Button
+                aria-label='เปิดการตั้งค่าและประวัติ'
+                className='absolute top-3 left-3 z-30 size-10 shadow-sm lg:hidden'
+                size='icon'
+                title='การตั้งค่าและประวัติ'
+                variant='outline'
+              />
+            }
+          >
+            <PanelLeftOpen className='size-5' />
+          </SheetTrigger>
+          <SheetContent className='w-[min(90vw,340px)] gap-0 p-0' side='left'>
+            <SheetHeader className='sr-only'>
+              <SheetTitle>การตั้งค่าและประวัติ</SheetTitle>
+            </SheetHeader>
+            <div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
+              <div className='max-h-[58%] shrink-0 overflow-y-auto'>
+                {renderDrawingSettings()}
+              </div>
+              {renderDrawingSessions()}
+            </div>
+          </SheetContent>
+        </Sheet>
         <div className='flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-8'>
           {turns.length === 0 ? (
             <div className='m-auto flex max-w-2xl flex-col items-center text-center'>
