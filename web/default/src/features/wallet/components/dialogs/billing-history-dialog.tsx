@@ -134,8 +134,8 @@ export function BillingHistoryDialog({
       >
         <div className='min-h-0 space-y-3'>
           {/* Search and Filter Bar */}
-          <div className='flex flex-wrap items-center gap-2'>
-            <div className='relative flex-1'>
+          <div className='grid items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]'>
+            <div className='relative min-w-0'>
               <Search className='text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2' />
               <Input
                 placeholder={t('Search by order number...')}
@@ -156,7 +156,7 @@ export function BillingHistoryDialog({
                 value !== null && handlePageSizeChange(parseInt(value))
               }
             >
-              <SelectTrigger className='h-9 w-[92px] sm:w-32'>
+              <SelectTrigger className='h-9 w-full sm:w-32'>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent alignItemWithTrigger={false}>
@@ -173,7 +173,7 @@ export function BillingHistoryDialog({
                 type='button'
                 variant='outline'
                 size='sm'
-                className='h-9 shrink-0'
+                className='h-9 w-full shrink-0 sm:w-auto'
                 onClick={handleExportCsv}
                 disabled={exporting || loading || total === 0}
               >
