@@ -17,8 +17,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useState } from 'react'
-import { Search, Copy, Check, ChevronLeft, ChevronRight } from 'lucide-react'
+import {
+  Search,
+  Copy,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { formatCurrencyFromUSD } from '@/lib/currency'
 import { formatNumber } from '@/lib/format'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
@@ -53,6 +61,7 @@ import {
   getPaymentMethodName,
   formatTimestamp,
 } from '../../lib/billing'
+import { downloadAdminTopupsCsv } from '../../lib/export-topups'
 
 interface BillingHistoryDialogProps {
   open: boolean
@@ -80,6 +89,7 @@ export function BillingHistoryDialog({
   } = useBillingHistory()
 
   const [confirmTradeNo, setConfirmTradeNo] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
   const { copyToClipboard, copiedText } = useCopyToClipboard({ notify: false })
 
   const totalPages = Math.ceil(total / pageSize)
@@ -90,6 +100,22 @@ export function BillingHistoryDialog({
       if (success) {
         setConfirmTradeNo(null)
       }
+    }
+  }
+
+  const handleExportCsv = async () => {
+    if (!isAdmin || exporting) return
+
+    setExporting(true)
+    try {
+      const count = await downloadAdminTopupsCsv(keyword)
+      toast.success(t('Exported {{count}} top-up records', { count }))
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to export top-up records:', error)
+      toast.error(t('Failed to export top-up records'))
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -108,7 +134,7 @@ export function BillingHistoryDialog({
       >
         <div className='min-h-0 space-y-3'>
           {/* Search and Filter Bar */}
-          <div className='flex items-center gap-2'>
+          <div className='flex flex-wrap items-center gap-2'>
             <div className='relative flex-1'>
               <Search className='text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2' />
               <Input
@@ -142,6 +168,19 @@ export function BillingHistoryDialog({
                 </SelectGroup>
               </SelectContent>
             </Select>
+            {isAdmin && (
+              <Button
+                type='button'
+                variant='outline'
+                size='sm'
+                className='h-9 shrink-0'
+                onClick={handleExportCsv}
+                disabled={exporting || loading || total === 0}
+              >
+                <Download className='mr-2 h-4 w-4' />
+                {exporting ? t('Exporting...') : t('Export CSV')}
+              </Button>
+            )}
           </div>
 
           {/* Records List */}

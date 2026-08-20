@@ -26,6 +26,7 @@ import {
   Bell,
   Calculator,
   Code2,
+  Download,
   Eye,
   FileSpreadsheet,
   Plus,
@@ -78,6 +79,7 @@ import { useUpdateOption } from '../hooks/use-update-option'
 import { AmountDiscountVisualEditor } from './amount-discount-visual-editor'
 import { AmountOptionsVisualEditor } from './amount-options-visual-editor'
 import { CreemProductsVisualEditor } from './creem-products-visual-editor'
+import { downloadAdminTopupsCsv } from '../../wallet/lib/export-topups'
 import { PaymentMethodsVisualEditor } from './payment-methods-visual-editor'
 import {
   formatJsonForEditor,
@@ -1146,6 +1148,7 @@ export function PaymentSettingsSection({
     paid: '100',
     credit: '300',
   })
+  const [exportingTopups, setExportingTopups] = React.useState(false)
 
   const complianceStatements = React.useMemo(
     () => [
@@ -1263,6 +1266,22 @@ export function PaymentSettingsSection({
       shouldValidate: true,
     })
     toast.success(t('Exchange rate updated'))
+  }
+
+  const handleExportTopupsCsv = async () => {
+    if (exportingTopups) return
+
+    setExportingTopups(true)
+    try {
+      const count = await downloadAdminTopupsCsv()
+      toast.success(t('Exported {{count}} top-up records', { count }))
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to export top-up records:', error)
+      toast.error(t('Failed to export top-up records'))
+    } finally {
+      setExportingTopups(false)
+    }
   }
 
   const saveGeneralSettings = async () => {
@@ -2663,16 +2682,30 @@ export function PaymentSettingsSection({
                         )}
                       </FormDescription>
                     </div>
-                    <div className='mt-6 flex items-center justify-between'>
+                    <div className='mt-6 flex flex-wrap items-center justify-between gap-3'>
                       <span className='text-muted-foreground text-sm'>
                         {t('Export enabled')}
                       </span>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
+                      <div className='flex items-center gap-2'>
+                        <Button
+                          type='button'
+                          variant='outline'
+                          size='sm'
+                          onClick={handleExportTopupsCsv}
+                          disabled={!field.value || exportingTopups}
+                        >
+                          <Download className='mr-2 h-4 w-4' />
+                          {exportingTopups
+                            ? t('Exporting...')
+                            : t('Export CSV')}
+                        </Button>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </div>
                     </div>
                   </FormItem>
                 )}
