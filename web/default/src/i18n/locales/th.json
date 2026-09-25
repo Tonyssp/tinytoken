@@ -4651,6 +4651,12 @@
     "Send this method slips to its own Telegram group": "ส่งสลิปของช่องทางนี้ไปยังกลุ่ม Telegram ของตัวเอง",
     "Send this method notices to its own LINE group": "ส่งแจ้งเตือนของช่องทางนี้ไปยังกลุ่ม LINE ของตัวเอง",
     "Optional per-method webhook secret": "รหัสลับ webhook เฉพาะช่องทางนี้ (ไม่บังคับ)",
-    "Leave blank to use the global secret or automatic token hash.": "เว้นว่างเพื่อใช้รหัสลับส่วนกลาง หรือให้ระบบสร้างจาก token อัตโนมัติ"
+    "Leave blank to use the global secret or automatic token hash.": "เว้นว่างเพื่อใช้รหัสลับส่วนกลาง หรือให้ระบบสร้างจาก token อัตโนมัติ",
+    "Search user by username": "ค้นหาผู้ใช้ด้วยชื่อผู้ใช้",
+    "View all user records": "ดูคำขอและบันทึกทั้งหมดของผู้ใช้นี้",
+    "All records for {{username}}": "บันทึกทั้งหมดของ {{username}}",
+    "All time": "ทุกช่วงเวลา",
+    "Use date range": "เลือกช่วงเวลา",
+    "Back to all users": "กลับไปดูผู้ใช้ทั้งหมด"
   }
 }

@@ -18,8 +18,11 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useCallback, useMemo } from 'react'
 import { getRouteApi, useNavigate } from '@tanstack/react-router'
+import { ArrowLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useIsAdmin } from '@/hooks/use-admin'
 import { useSidebarConfig } from '@/hooks/use-sidebar-config'
+import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SectionPageLayout } from '@/components/layout'
 import type { NavGroup } from '@/components/layout/types'
@@ -54,7 +57,9 @@ const SECTION_META: Record<UsageLogsSectionId, { titleKey: string }> = {
 function UsageLogsContent() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const isAdmin = useIsAdmin()
   const params = route.useParams()
+  const search = route.useSearch()
   const activeCategory: UsageLogsSectionId =
     params.section && isUsageLogsSectionId(params.section)
       ? params.section
@@ -107,6 +112,22 @@ function UsageLogsContent() {
     activeCategory === 'common' ? SECTION_META.common : SECTION_META.task
   const showTaskSwitcher =
     activeCategory !== 'common' && visibleSections.length > 1
+  const activeUsername =
+    isAdmin && activeCategory === 'common' && search.allTime
+      ? search.username?.trim()
+      : undefined
+
+  const handleViewUserRecords = useCallback(
+    (username: string) => {
+      setUserInfoDialogOpen(false)
+      void navigate({
+        to: '/usage-logs/$section',
+        params: { section: 'common' },
+        search: { username, allTime: true, page: 1, type: ['0'] },
+      })
+    },
+    [navigate, setUserInfoDialogOpen]
+  )
 
   return (
     <>
@@ -127,6 +148,35 @@ function UsageLogsContent() {
                 </TabsList>
               </Tabs>
             )}
+            {activeUsername && (
+              <div className='bg-background flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3'>
+                <div className='min-w-0'>
+                  <p className='text-sm font-semibold break-all'>
+                    {t('All records for {{username}}', {
+                      username: activeUsername,
+                    })}
+                  </p>
+                  <p className='text-muted-foreground text-xs'>
+                    {t('All time')}
+                  </p>
+                </div>
+                <Button
+                  type='button'
+                  size='sm'
+                  variant='outline'
+                  onClick={() => {
+                    void navigate({
+                      to: '/usage-logs/$section',
+                      params: { section: 'common' },
+                      search: { page: 1 },
+                    })
+                  }}
+                >
+                  <ArrowLeft className='size-4' />
+                  {t('Back to all users')}
+                </Button>
+              </div>
+            )}
             <div className='min-h-0 flex-1'>
               <UsageLogsTable logCategory={activeCategory} />
             </div>
@@ -138,6 +188,7 @@ function UsageLogsContent() {
         userId={selectedUserId}
         open={userInfoDialogOpen}
         onOpenChange={setUserInfoDialogOpen}
+        onViewRecords={isAdmin ? handleViewUserRecords : undefined}
       />
 
       <CacheStatsDialog

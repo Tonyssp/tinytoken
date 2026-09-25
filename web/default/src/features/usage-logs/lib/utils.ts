@@ -217,7 +217,9 @@ export function buildApiParams(config: {
     ...(searchParams.upstreamRequestId
       ? { upstream_request_id: String(searchParams.upstreamRequestId) }
       : {}),
-    ...buildTimeRangeParams(searchParams, false),
+    ...(isAdmin && searchParams.username && searchParams.allTime === true
+      ? {}
+      : buildTimeRangeParams(searchParams, false)),
   }
 
   // Override with column filters if present

@@ -4609,6 +4609,12 @@
     "No API key yet? Create one from Dashboard first.": "No API key yet? Create one from Dashboard first.",
     "Pay-as-you-go AI API": "Pay-as-you-go AI API",
     "Buy balance, create API keys, and start calling models.": "Buy balance, create API keys, and start calling models.",
-    "Works with Claude Code, Codex CLI, and OpenAI-compatible tools.": "Works with Claude Code, Codex CLI, and OpenAI-compatible tools."
+    "Works with Claude Code, Codex CLI, and OpenAI-compatible tools.": "Works with Claude Code, Codex CLI, and OpenAI-compatible tools.",
+    "Search user by username": "按用户名搜索用户",
+    "View all user records": "查看该用户的所有请求与记录",
+    "All records for {{username}}": "{{username}} 的所有记录",
+    "All time": "全部时间",
+    "Use date range": "选择日期范围",
+    "Back to all users": "返回全部用户"
   }
 }

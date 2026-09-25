@@ -73,7 +73,10 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
   } = useTableUrlState({
     search: route.useSearch(),
     navigate: route.useNavigate(),
-    pagination: { defaultPage: 1, defaultPageSize: isMobile ? 20 : 100 },
+    pagination: {
+      defaultPage: 1,
+      defaultPageSize: isMobile || (isAdmin && searchParams.allTime) ? 20 : 100,
+    },
     globalFilter: { enabled: false },
     columnFilters: [
       {

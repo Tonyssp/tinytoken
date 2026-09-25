@@ -4677,6 +4677,12 @@
     "Send this method slips to its own Telegram group": "Send this method slips to its own Telegram group",
     "Send this method notices to its own LINE group": "Send this method notices to its own LINE group",
     "Optional per-method webhook secret": "Optional per-method webhook secret",
-    "Leave blank to use the global secret or automatic token hash.": "Leave blank to use the global secret or automatic token hash."
+    "Leave blank to use the global secret or automatic token hash.": "Leave blank to use the global secret or automatic token hash.",
+    "Search user by username": "Search user by username",
+    "View all user records": "View all user records",
+    "All records for {{username}}": "All records for {{username}}",
+    "All time": "All time",
+    "Use date range": "Use date range",
+    "Back to all users": "Back to all users"
   }
 }

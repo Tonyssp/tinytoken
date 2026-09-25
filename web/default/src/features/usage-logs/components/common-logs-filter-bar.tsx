@@ -41,6 +41,7 @@ import { LOG_TYPE_ALL_VALUE, LOG_TYPE_FILTERS } from '../constants'
 import { buildSearchParams } from '../lib/filter'
 import { getDefaultTimeRange } from '../lib/utils'
 import type { CommonLogFilters } from '../types'
+import { AdminUserSearch } from './admin-user-search'
 import { CommonLogsStats } from './common-logs-stats'
 import { CompactDateTimeRangePicker } from './compact-date-time-range-picker'
 import {
@@ -82,6 +83,7 @@ export function CommonLogsFilterBar<TData>(
 
   useEffect(() => {
     const { start, end } = getDefaultTimeRange()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFilters({
       startTime: searchParams.startTime
         ? new Date(searchParams.startTime)
@@ -132,12 +134,13 @@ export function CommonLogsFilterBar<TData>(
       search: {
         ...filterParams,
         type: [logType],
+        allTime: !!filters.username && searchParams.allTime === true,
         page: 1,
       },
     })
     queryClient.invalidateQueries({ queryKey: ['logs'] })
     queryClient.invalidateQueries({ queryKey: ['usage-logs-stats'] })
-  }, [filters, logType, navigate, queryClient])
+  }, [filters, logType, navigate, queryClient, searchParams.allTime])
 
   const handleReset = useCallback(() => {
     const { start, end } = getDefaultTimeRange()
@@ -151,6 +154,7 @@ export function CommonLogsFilterBar<TData>(
       search: {
         page: 1,
         type: [LOG_TYPE_ALL_VALUE],
+        allTime: false,
         startTime: start.getTime(),
         endTime: end.getTime(),
       },
@@ -166,20 +170,38 @@ export function CommonLogsFilterBar<TData>(
     [handleApply]
   )
 
+  const handleSelectUser = useCallback(
+    (username: string) => {
+      void navigate({
+        to: '/usage-logs/$section',
+        params: { section: 'common' },
+        search: {
+          username,
+          allTime: true,
+          type: [LOG_TYPE_ALL_VALUE],
+          page: 1,
+        },
+      })
+    },
+    [navigate]
+  )
+
   const hasExpandedFilters =
     !!filters.token ||
-    !!filters.username ||
     !!filters.channel ||
     !!filters.requestId ||
     !!filters.upstreamRequestId
 
   const hasTypeFilter = logType !== LOG_TYPE_ALL_VALUE
   const hasAdditionalFilters =
-    !!filters.model || !!filters.group || hasTypeFilter || hasExpandedFilters
+    !!filters.model ||
+    !!filters.group ||
+    !!filters.username ||
+    hasTypeFilter ||
+    hasExpandedFilters
 
   const expandedFilterCount = [
     filters.token,
-    isAdmin ? filters.username : undefined,
     isAdmin ? filters.channel : undefined,
     filters.requestId,
     filters.upstreamRequestId,
@@ -220,18 +242,44 @@ export function CommonLogsFilterBar<TData>(
     </div>
   )
 
-  const dateRangeFilter = (
-    <LogsFilterField wide>
-      <CompactDateTimeRangePicker
-        start={filters.startTime}
-        end={filters.endTime}
-        onChange={({ start, end }) => {
-          handleChange('startTime', start)
-          handleChange('endTime', end)
-        }}
-      />
-    </LogsFilterField>
-  )
+  const dateRangeFilter =
+    isAdmin && searchParams.username?.trim() && searchParams.allTime ? (
+      <LogsFilterField wide>
+        <div className='flex h-8 items-center justify-between gap-2 rounded-md border px-2 text-sm'>
+          <span>{t('All time')}</span>
+          <button
+            type='button'
+            className='text-primary shrink-0 text-xs hover:underline'
+            onClick={() => {
+              void navigate({
+                to: '/usage-logs/$section',
+                params: { section: 'common' },
+                search: {
+                  ...searchParams,
+                  allTime: false,
+                  startTime: filters.startTime?.getTime(),
+                  endTime: filters.endTime?.getTime(),
+                  page: 1,
+                },
+              })
+            }}
+          >
+            {t('Use date range')}
+          </button>
+        </div>
+      </LogsFilterField>
+    ) : (
+      <LogsFilterField wide>
+        <CompactDateTimeRangePicker
+          start={filters.startTime}
+          end={filters.endTime}
+          onChange={({ start, end }) => {
+            handleChange('startTime', start)
+            handleChange('endTime', end)
+          }}
+        />
+      </LogsFilterField>
+    )
   const modelFilter = (
     <LogsFilterField>
       <LogsFilterInput
@@ -293,17 +341,6 @@ export function CommonLogsFilterBar<TData>(
       {isAdmin && (
         <LogsFilterField>
           <LogsFilterInput
-            placeholder={t('Username')}
-            type={sensitiveType}
-            value={filters.username || ''}
-            onChange={(e) => handleChange('username', e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-        </LogsFilterField>
-      )}
-      {isAdmin && (
-        <LogsFilterField>
-          <LogsFilterInput
             placeholder={t('Channel ID')}
             value={filters.channel || ''}
             onChange={(e) => handleChange('channel', e.target.value)}
@@ -337,6 +374,16 @@ export function CommonLogsFilterBar<TData>(
       primaryFilters={
         <>
           {dateRangeFilter}
+          {isAdmin && (
+            <LogsFilterField>
+              <AdminUserSearch
+                value={filters.username || ''}
+                onChange={(value) => handleChange('username', value)}
+                onSelect={handleSelectUser}
+                onSubmit={handleApply}
+              />
+            </LogsFilterField>
+          )}
           {modelFilter}
           {groupFilter}
           {typeFilter}
@@ -347,14 +394,29 @@ export function CommonLogsFilterBar<TData>(
       mobileFilters={
         <>
           {modelFilter}
+          {isAdmin && (
+            <LogsFilterField>
+              <LogsFilterInput
+                placeholder={t('Search user by username')}
+                aria-label={t('Search user by username')}
+                value={filters.username || ''}
+                onChange={(e) => handleChange('username', e.target.value)}
+                onKeyDown={handleKeyDown}
+              />
+            </LogsFilterField>
+          )}
           {groupFilter}
           {typeFilter}
           {advancedFilters}
         </>
       }
       mobileFilterCount={
-        [filters.model, filters.group, hasTypeFilter].filter(Boolean).length +
-        expandedFilterCount
+        [
+          filters.model,
+          filters.group,
+          isAdmin ? filters.username : undefined,
+          hasTypeFilter,
+        ].filter(Boolean).length + expandedFilterCount
       }
       hasAdvancedActiveFilters={hasExpandedFilters}
       advancedFilterCount={expandedFilterCount}
