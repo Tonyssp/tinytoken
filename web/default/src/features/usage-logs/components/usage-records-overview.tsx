@@ -41,6 +41,7 @@ import type {
   UsageSummaryGroup,
 } from '@/features/dashboard/types'
 import { getDefaultTimeRange } from '../lib/utils'
+import { useUsageLogsContext } from './usage-logs-provider'
 
 const route = getRouteApi('/_authenticated/usage-logs/$section')
 const CHART_COLORS = [
@@ -209,6 +210,7 @@ function DistributionPanel({
 export function UsageRecordsOverview() {
   const { t } = useTranslation()
   const isAdmin = useIsAdmin()
+  const { autoRefresh } = useUsageLogsContext()
   const search = route.useSearch()
   const navigate = route.useNavigate()
   const [granularity, setGranularity] = useState<'day' | 'week'>('day')
@@ -231,10 +233,17 @@ export function UsageRecordsOverview() {
     ],
     queryFn: () =>
       getUsageSummary(
-        { start_timestamp: range.start, end_timestamp: range.end, username },
+        {
+          start_timestamp: range.start,
+          end_timestamp: search.endTime
+            ? range.end
+            : Math.floor(getDefaultTimeRange().end.getTime() / 1000),
+          username,
+        },
         isAdmin
       ),
     staleTime: 60_000,
+    refetchInterval: autoRefresh ? 180_000 : false,
   })
   const trendQuery = useQuery({
     queryKey: [
@@ -246,10 +255,17 @@ export function UsageRecordsOverview() {
     ],
     queryFn: () =>
       getUserQuotaDates(
-        { start_timestamp: range.start, end_timestamp: range.end, username },
+        {
+          start_timestamp: range.start,
+          end_timestamp: search.endTime
+            ? range.end
+            : Math.floor(getDefaultTimeRange().end.getTime() / 1000),
+          username,
+        },
         isAdmin
       ),
     staleTime: 60_000,
+    refetchInterval: autoRefresh ? 180_000 : false,
   })
   const summary = summaryQuery.data?.success
     ? summaryQuery.data.data

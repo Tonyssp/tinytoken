@@ -484,30 +484,6 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
     },
   })
 
-  columns.push(
-    {
-      accessorKey: 'ip',
-      header: t('IP address'),
-      cell: function IpCell({ row }) {
-        const { sensitiveVisible } = useUsageLogsContext()
-        const ip = row.original.ip
-        return (
-          <span
-            className='font-mono text-xs'
-            title={sensitiveVisible ? ip : undefined}
-          >
-            {ip ? (sensitiveVisible ? ip : '••••') : '—'}
-          </span>
-        )
-      },
-    },
-    {
-      accessorKey: 'country',
-      header: t('Country'),
-      cell: ({ row }) => row.original.country || '—',
-    }
-  )
-
   columns.push({
     accessorKey: 'token_name',
     header: t('API Key'),
@@ -608,17 +584,6 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
         row.original.type === 2
           ? t(row.original.is_stream ? 'Stream' : 'Non-stream')
           : t(getLogTypeConfig(row.original.type).label),
-    },
-    {
-      id: 'billing_mode',
-      header: t('Billing Mode'),
-      accessorFn: (row) => parseLogOther(row.other)?.billing_mode || '',
-      cell: ({ row }) => {
-        const other = parseLogOther(row.original.other)
-        return other?.billing_source === 'subscription'
-          ? t('Subscription')
-          : other?.billing_mode || '—'
-      },
     },
     {
       accessorKey: 'use_time',
@@ -895,11 +860,8 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
     'model_name',
     'reasoning_effort',
     'request_path',
-    'ip',
-    'country',
     'group',
     'request_type',
-    'billing_mode',
     'prompt_tokens',
     'quota',
     'use_time',

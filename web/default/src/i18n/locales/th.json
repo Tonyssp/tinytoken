@@ -3762,7 +3762,7 @@
     "Subscription Plans": "แผนการสมัครสมาชิก",
     "Subtract": "ลบ",
     "Success": "ความสำเร็จ",
-    "Success rate": "Success rate",
+    "Success rate": "อัตราคำขอสำเร็จ",
     "Successfully created {{count}} API Key(s)": "สร้างคีย์ {{count}} API สำเร็จแล้ว",
     "Successfully created {{count}} redemption codes": "สร้างรหัสแลกรับ {{count}} สำเร็จแล้ว",
     "Successfully deleted {{count}} API key(s)": "ลบคีย์ {{count}} API สำเร็จแล้ว",
@@ -4714,6 +4714,13 @@
     "All records for {{username}}": "บันทึกทั้งหมดของ {{username}}",
     "All time": "ทุกช่วงเวลา",
     "Use date range": "เลือกช่วงเวลา",
-    "Back to all users": "กลับไปดูผู้ใช้ทั้งหมด"
+    "Back to all users": "กลับไปดูผู้ใช้ทั้งหมด",
+    "API providers": "ผู้ให้บริการ API",
+    "Observed from API requests, not an active uptime check.": "สถิติจากคำขอ API จริง ไม่ใช่การตรวจสอบสถานะแบบต่อเนื่อง",
+    "Recent success": "คำขอล่าสุดสำเร็จ",
+    "Recent failures": "คำขอล่าสุดล้มเหลว",
+    "Recent request results": "ผลคำขอล่าสุด",
+    "Degraded": "ประสิทธิภาพลดลง",
+    "No active API channels": "ไม่มีช่องทาง API ที่เปิดใช้งาน"
   }
 }

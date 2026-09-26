@@ -41,6 +41,7 @@ import type { LogCategory } from '../types'
 import { CommonLogsFilterBar } from './common-logs-filter-bar'
 import { TaskLogsFilterBar } from './task-logs-filter-bar'
 import { UsageLogsMobileList } from './usage-logs-mobile-card'
+import { useUsageLogsContext } from './usage-logs-provider'
 
 const route = getRouteApi('/_authenticated/usage-logs/$section')
 
@@ -63,6 +64,7 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
   const isAdmin = useIsAdmin()
   const isMobile = useMediaQuery('(max-width: 640px)')
   const searchParams = route.useSearch()
+  const { autoRefresh } = useUsageLogsContext()
 
   const {
     columnFilters,
@@ -139,6 +141,7 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
       }
       return undefined
     },
+    refetchInterval: logCategory === 'common' && autoRefresh ? 180_000 : false,
   })
 
   const logs = data?.items || []
@@ -177,7 +180,7 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
       applyHeaderSize
       tableClassName={cn(
         '[&_[data-slot=table]]:text-[13px] [&_[data-slot=table]_td]:text-[13px] [&_[data-slot=table]_td_*]:text-[13px] [&_[data-slot=table]_th]:text-[13px] [&_[data-slot=table]_th_*]:text-[13px]',
-        logCategory === 'common' && '[&_[data-slot=table]]:min-w-[1550px]'
+        logCategory === 'common' && '[&_[data-slot=table]]:min-w-[1250px]'
       )}
       mobile={
         <UsageLogsMobileList

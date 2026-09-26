@@ -50,7 +50,7 @@ export function CommonLogsStats() {
   const { t } = useTranslation()
   const isAdmin = useIsAdmin()
   const searchParams = route.useSearch()
-  const { sensitiveVisible } = useUsageLogsContext()
+  const { sensitiveVisible, autoRefresh } = useUsageLogsContext()
 
   const { data: stats, isLoading } = useQuery({
     queryKey: ['usage-logs-stats', isAdmin, searchParams],
@@ -72,6 +72,7 @@ export function CommonLogsStats() {
         : DEFAULT_LOG_STATS
     },
     placeholderData: (previousData) => previousData,
+    refetchInterval: autoRefresh ? 180_000 : false,
   })
 
   if (isLoading) {

@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting/console_setting"
 
 	"github.com/gin-gonic/gin"
@@ -34,7 +36,43 @@ type Monitor struct {
 
 type UptimeGroupResult struct {
 	CategoryName string    `json:"categoryName"`
+	Source       string    `json:"source,omitempty"`
 	Monitors     []Monitor `json:"monitors"`
+}
+
+var observedStatusCache struct {
+	sync.Mutex
+	updatedAt time.Time
+	groups    []UptimeGroupResult
+}
+
+func getObservedStatus(ctx context.Context) ([]UptimeGroupResult, error) {
+	observedStatusCache.Lock()
+	defer observedStatusCache.Unlock()
+	if time.Since(observedStatusCache.updatedAt) < 2*time.Minute {
+		return observedStatusCache.groups, nil
+	}
+	items, err := model.GetObservedChannelStatus(ctx, time.Now())
+	if err != nil {
+		return nil, err
+	}
+	monitors := make([]Monitor, 0, len(items))
+	for _, item := range items {
+		monitors = append(monitors, Monitor{
+			Name:            item.Name,
+			Uptime:          item.SuccessRate,
+			Status:          item.Status,
+			UptimeAvailable: item.HasRequests,
+			History:         item.History,
+		})
+	}
+	observedStatusCache.groups = []UptimeGroupResult{{
+		CategoryName: "API providers",
+		Source:       "observed",
+		Monitors:     monitors,
+	}}
+	observedStatusCache.updatedAt = time.Now()
+	return observedStatusCache.groups, nil
 }
 
 func getAndDecode(ctx context.Context, client *http.Client, url string, dest interface{}) error {
@@ -138,7 +176,12 @@ func fetchGroupData(ctx context.Context, client *http.Client, groupConfig map[st
 func GetUptimeKumaStatus(c *gin.Context) {
 	groups := console_setting.GetUptimeKumaGroups()
 	if len(groups) == 0 {
-		c.JSON(http.StatusOK, gin.H{"success": true, "message": "", "data": []UptimeGroupResult{}})
+		results, err := getObservedStatus(c.Request.Context())
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "Unable to load channel status"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"success": true, "message": "", "data": results})
 		return
 	}
 

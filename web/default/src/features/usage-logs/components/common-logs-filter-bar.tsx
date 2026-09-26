@@ -32,6 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import {
   Tooltip,
   TooltipContent,
@@ -72,7 +73,8 @@ export function CommonLogsFilterBar<TData>(
   const queryClient = useQueryClient()
   const searchParams = route.useSearch()
   const isAdmin = useIsAdmin()
-  const { sensitiveVisible, setSensitiveVisible } = useUsageLogsContext()
+  const { sensitiveVisible, setSensitiveVisible, autoRefresh, setAutoRefresh } =
+    useUsageLogsContext()
   const fetchingLogs = useIsFetching({ queryKey: ['logs'] })
 
   const [filters, setFilters] = useState<CommonLogFilters>(() => {
@@ -230,6 +232,14 @@ export function CommonLogsFilterBar<TData>(
   const statsBar = (
     <div className='flex flex-wrap items-center gap-2'>
       <CommonLogsStats />
+      <label className='text-muted-foreground flex items-center gap-2 text-xs'>
+        <Switch
+          checked={autoRefresh}
+          onCheckedChange={setAutoRefresh}
+          aria-label={t('Auto refresh')}
+        />
+        {t('Auto refresh')} · 3m
+      </label>
       <Tooltip>
         <TooltipTrigger
           render={

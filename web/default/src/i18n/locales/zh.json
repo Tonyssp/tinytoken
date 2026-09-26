@@ -4659,6 +4659,13 @@
     "All records for {{username}}": "{{username}} 的全部记录",
     "All time": "全部时间",
     "Use date range": "选择时间范围",
-    "Back to all users": "返回全部用户"
+    "Back to all users": "返回全部用户",
+    "API providers": "API 提供商",
+    "Observed from API requests, not an active uptime check.": "根据实际 API 请求统计，并非主动在线检测。",
+    "Recent success": "最近请求成功",
+    "Recent failures": "最近请求失败",
+    "Recent request results": "最近请求结果",
+    "Degraded": "性能下降",
+    "No active API channels": "没有启用的 API 渠道"
   }
 }

@@ -4610,6 +4610,13 @@
     "No API key yet? Create one from Dashboard first.": "Ch?a c? API key? H?y t?o trong Dashboard tr??c.",
     "Pay-as-you-go AI API": "AI API tr? theo m?c s? d?ng",
     "Buy balance, create API keys, and start calling models.": "N?p s? d?, t?o API key v? b?t ??u g?i m? h?nh.",
-    "Works with Claude Code, Codex CLI, and OpenAI-compatible tools.": "Ho?t ??ng v?i Claude Code, Codex CLI v? c?ng c? t??ng th?ch OpenAI."
+    "Works with Claude Code, Codex CLI, and OpenAI-compatible tools.": "Ho?t ??ng v?i Claude Code, Codex CLI v? c?ng c? t??ng th?ch OpenAI.",
+    "API providers": "Nhà cung cấp API",
+    "Observed from API requests, not an active uptime check.": "Thống kê từ yêu cầu API thực tế, không phải kiểm tra trạng thái chủ động.",
+    "Recent success": "Yêu cầu gần đây thành công",
+    "Recent failures": "Yêu cầu gần đây thất bại",
+    "Recent request results": "Kết quả yêu cầu gần đây",
+    "Degraded": "Hiệu suất giảm",
+    "No active API channels": "Không có kênh API đang hoạt động"
   }
 }

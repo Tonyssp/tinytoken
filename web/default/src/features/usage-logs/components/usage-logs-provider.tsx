@@ -31,6 +31,8 @@ interface UsageLogsContextValue {
   setAffinityDialogOpen: (open: boolean) => void
   sensitiveVisible: boolean
   setSensitiveVisible: (visible: boolean) => void
+  autoRefresh: boolean
+  setAutoRefresh: (enabled: boolean) => void
 }
 
 const UsageLogsContext = createContext<UsageLogsContextValue | undefined>(
@@ -44,6 +46,7 @@ export function UsageLogsProvider({ children }: { children: ReactNode }) {
     useState<ChannelAffinityInfo | null>(null)
   const [affinityDialogOpen, setAffinityDialogOpen] = useState(false)
   const [sensitiveVisible, setSensitiveVisible] = useState(true)
+  const [autoRefresh, setAutoRefresh] = useState(true)
 
   return (
     <UsageLogsContext.Provider
@@ -58,6 +61,8 @@ export function UsageLogsProvider({ children }: { children: ReactNode }) {
         setAffinityDialogOpen,
         sensitiveVisible,
         setSensitiveVisible,
+        autoRefresh,
+        setAutoRefresh,
       }}
     >
       {children}

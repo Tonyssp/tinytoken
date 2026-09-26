@@ -4712,6 +4712,13 @@
     "All records for {{username}}": "All records for {{username}}",
     "All time": "All time",
     "Use date range": "Use date range",
-    "Back to all users": "Back to all users"
+    "Back to all users": "Back to all users",
+    "API providers": "API providers",
+    "Observed from API requests, not an active uptime check.": "Observed from API requests, not an active uptime check.",
+    "Recent success": "Recent success",
+    "Recent failures": "Recent failures",
+    "Recent request results": "Recent request results",
+    "Degraded": "Degraded",
+    "No active API channels": "No active API channels"
   }
 }

@@ -22,7 +22,13 @@ import { PublicLayout, SectionPageLayout } from '@/components/layout'
 import { getUptimeStatus } from '@/features/dashboard/api'
 import type { UptimeMonitor } from '@/features/dashboard/types'
 
-function MonitorCard({ monitor }: { monitor: UptimeMonitor }) {
+function MonitorCard({
+  monitor,
+  observed,
+}: {
+  monitor: UptimeMonitor
+  observed: boolean
+}) {
   const { t } = useTranslation()
   const points = monitor.history || []
   return (
@@ -40,51 +46,71 @@ function MonitorCard({ monitor }: { monitor: UptimeMonitor }) {
           </div>
         </div>
         <span
-          className={`shrink-0 rounded px-2 py-1 text-xs font-semibold ${monitor.status === 1 ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : monitor.status === 0 ? 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300' : 'bg-muted text-muted-foreground'}`}
+          className={`shrink-0 rounded px-2 py-1 text-xs font-semibold ${monitor.status === 1 ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : monitor.status === 0 ? 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300' : monitor.status === 2 ? 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300' : 'bg-muted text-muted-foreground'}`}
         >
           {monitor.status === 1
-            ? t('Operational')
+            ? t(observed ? 'Recent success' : 'Operational')
             : monitor.status === 0
-              ? t('Unavailable')
-              : t('Unknown')}
+              ? t(observed ? 'Recent failures' : 'Unavailable')
+              : monitor.status === 2
+                ? t('Degraded')
+                : t(observed ? 'No recent usage' : 'Unknown')}
         </span>
       </div>
-      <div className='grid grid-cols-3 gap-2 py-6'>
-        <div>
-          <p className='text-muted-foreground text-[10px] font-bold uppercase'>
-            {t('Cache rate')}
-          </p>
-          <p className='mt-2 font-mono text-lg font-bold'>—</p>
-        </div>
-        <div>
-          <p className='text-muted-foreground text-[10px] font-bold uppercase'>
-            {t('Availability')}
-          </p>
-          <p
-            className={`mt-2 font-mono text-lg font-bold ${monitor.status === 1 ? 'text-emerald-700 dark:text-emerald-400' : monitor.status === 0 ? 'text-red-600' : ''}`}
-          >
-            {monitor.uptimeAvailable
-              ? `${(monitor.uptime * 100).toFixed(1)}%`
-              : '—'}
-          </p>
-        </div>
-        <div>
-          <p className='text-muted-foreground text-[10px] font-bold uppercase'>
-            {t('First token')}
-          </p>
-          <p className='mt-2 font-mono text-lg font-bold'>—</p>
-        </div>
+      <div className={observed ? 'py-6' : 'grid grid-cols-3 gap-2 py-6'}>
+        {observed ? (
+          <div>
+            <p className='text-muted-foreground text-[10px] font-bold uppercase'>
+              {t('Success rate')}
+            </p>
+            <p className='mt-2 font-mono text-lg font-bold'>
+              {monitor.uptimeAvailable
+                ? `${(monitor.uptime * 100).toFixed(1)}%`
+                : '—'}
+            </p>
+          </div>
+        ) : (
+          <>
+            <div>
+              <p className='text-muted-foreground text-[10px] font-bold uppercase'>
+                {t('Cache rate')}
+              </p>
+              <p className='mt-2 font-mono text-lg font-bold'>—</p>
+            </div>
+            <div>
+              <p className='text-muted-foreground text-[10px] font-bold uppercase'>
+                {t('Availability')}
+              </p>
+              <p
+                className={`mt-2 font-mono text-lg font-bold ${monitor.status === 1 ? 'text-emerald-700 dark:text-emerald-400' : monitor.status === 0 ? 'text-red-600' : ''}`}
+              >
+                {monitor.uptimeAvailable
+                  ? `${(monitor.uptime * 100).toFixed(1)}%`
+                  : '—'}
+              </p>
+            </div>
+            <div>
+              <p className='text-muted-foreground text-[10px] font-bold uppercase'>
+                {t('First token')}
+              </p>
+              <p className='mt-2 font-mono text-lg font-bold'>—</p>
+            </div>
+          </>
+        )}
       </div>
       <div className='border-t border-slate-100 pt-3 dark:border-slate-800'>
         <div className='text-muted-foreground mb-2 flex justify-between text-[10px] font-semibold uppercase'>
           <span>
-            {t('History')} ({points.length})
+            {t(observed ? 'Recent request results' : 'History')} (
+            {points.length})
           </span>
           <span>24h</span>
         </div>
         <div
           className='flex h-7 items-end gap-1'
-          aria-label={t('Recent availability history')}
+          aria-label={t(
+            observed ? 'Recent request results' : 'Recent availability history'
+          )}
         >
           {Array.from({ length: 18 }, (_, index) => {
             const status = points[index - (18 - points.length)]
@@ -111,9 +137,10 @@ function ChannelStatusContent({ embedded = false }: { embedded?: boolean }) {
     useQuery({
       queryKey: ['public-channel-status'],
       queryFn: async () => (await getUptimeStatus()).data,
-      refetchInterval: 60_000,
+      refetchInterval: 180_000,
     })
   const groups = (data || []).filter((group) => group.monitors?.length)
+  const observed = groups.some((group) => group.source === 'observed')
   const reported = groups
     .flatMap((group) => group.monitors)
     .filter((monitor) => monitor.uptimeAvailable)
@@ -122,9 +149,7 @@ function ChannelStatusContent({ embedded = false }: { embedded?: boolean }) {
     : '—'
   const monitors = groups.flatMap((group) => group.monitors)
   const healthyCount = monitors.filter((monitor) => monitor.status === 1).length
-  const degradedCount = monitors.filter(
-    (monitor) => monitor.status === 0
-  ).length
+  const failureCount = monitors.filter((monitor) => monitor.status === 0).length
   return (
     <div
       className={
@@ -168,10 +193,17 @@ function ChannelStatusContent({ embedded = false }: { embedded?: boolean }) {
             <span className='border-b-2 border-sky-600 pb-1 font-bold text-sky-700 dark:text-sky-300'>
               24h
             </span>
-            <span>{t('Passive availability monitoring')}</span>
+            <span>
+              {observed
+                ? t('Observed from API requests, not an active uptime check.')
+                : t('Passive availability monitoring')}
+            </span>
+            <span>{t('Auto refresh')} · 3m</span>
             <span className='ml-auto font-semibold'>
-              {t('Operational')} {healthyCount}/{monitors.length} ·{' '}
-              {t('Unavailable')} {degradedCount} · {t('Availability')}{' '}
+              {t(observed ? 'Recent success' : 'Operational')} {healthyCount}/
+              {monitors.length} ·{' '}
+              {t(observed ? 'Recent failures' : 'Unavailable')} {failureCount} ·{' '}
+              {t(observed ? 'Success rate' : 'Availability')}{' '}
               {averageAvailability}
             </span>
           </div>
@@ -188,14 +220,18 @@ function ChannelStatusContent({ embedded = false }: { embedded?: boolean }) {
         )}
         {!isLoading && !isError && groups.length === 0 && (
           <p className='text-muted-foreground mt-10 rounded-xl border bg-white p-8 text-center'>
-            {t('No uptime monitoring configured')}
+            {t('No active API channels')}
           </p>
         )}
         <div className='mt-5 space-y-10'>
           {groups.map((group) => (
             <section key={group.categoryName}>
               <div className='mb-2 flex items-center justify-between text-xs font-bold text-slate-600 uppercase dark:text-slate-300'>
-                <h2>{group.categoryName}</h2>
+                <h2>
+                  {group.source === 'observed'
+                    ? t('API providers')
+                    : group.categoryName}
+                </h2>
                 <span>{group.monitors.length}</span>
               </div>
               <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
@@ -203,17 +239,20 @@ function ChannelStatusContent({ embedded = false }: { embedded?: boolean }) {
                   <MonitorCard
                     key={`${group.categoryName}-${monitor.name}`}
                     monitor={monitor}
+                    observed={group.source === 'observed'}
                   />
                 ))}
               </div>
             </section>
           ))}
         </div>
-        <p className='text-muted-foreground mt-8 text-xs'>
-          {t(
-            'Cache rate and first-token latency are not supplied by this monitor. A dash means unavailable, not zero.'
-          )}
-        </p>
+        {!observed && (
+          <p className='text-muted-foreground mt-8 text-xs'>
+            {t(
+              'Cache rate and first-token latency are not supplied by this monitor. A dash means unavailable, not zero.'
+            )}
+          </p>
+        )}
       </div>
     </div>
   )

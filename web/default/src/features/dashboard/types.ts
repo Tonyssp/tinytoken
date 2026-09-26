@@ -67,6 +67,7 @@ export interface UptimeMonitor {
 
 export interface UptimeGroupResult {
   categoryName: string
+  source?: 'observed'
   monitors: UptimeMonitor[]
 }
 
