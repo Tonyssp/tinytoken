@@ -177,8 +177,18 @@ func getImageToken(c *gin.Context, fileMeta *types.FileMeta, model string, strea
 }
 
 func EstimateRequestToken(c *gin.Context, meta *types.TokenCountMeta, info *relaycommon.RelayInfo) (int, error) {
+	return estimateRequestToken(c, meta, info, false)
+}
+
+// EstimateRequestTokenForLimit counts input even when optional billing token
+// estimation is disabled, so a configured request limit cannot be bypassed.
+func EstimateRequestTokenForLimit(c *gin.Context, meta *types.TokenCountMeta, info *relaycommon.RelayInfo) (int, error) {
+	return estimateRequestToken(c, meta, info, true)
+}
+
+func estimateRequestToken(c *gin.Context, meta *types.TokenCountMeta, info *relaycommon.RelayInfo, force bool) (int, error) {
 	// 是否统计token
-	if !constant.CountToken {
+	if !constant.CountToken && !force {
 		return 0, nil
 	}
 

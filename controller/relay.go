@@ -22,6 +22,7 @@ import (
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting"
+	"github.com/QuantumNous/new-api/setting/model_setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/types"
 
@@ -63,6 +64,19 @@ func geminiRelayHandler(c *gin.Context, info *relaycommon.RelayInfo) *types.NewA
 		err = relay.GeminiHelper(c, info)
 	}
 	return err
+}
+
+func isInputLimitRelay(format types.RelayFormat, mode int) bool {
+	switch format {
+	case types.RelayFormatOpenAI:
+		return mode == relayconstant.RelayModeChatCompletions || mode == relayconstant.RelayModeCompletions
+	case types.RelayFormatOpenAIResponses:
+		return mode == relayconstant.RelayModeResponses
+	case types.RelayFormatOpenAIResponsesCompaction:
+		return mode == relayconstant.RelayModeResponsesCompact
+	default:
+		return false
+	}
 }
 
 func Relay(c *gin.Context, relayFormat types.RelayFormat) {
@@ -124,7 +138,49 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	}
 
 	needSensitiveCheck := setting.ShouldCheckPromptSensitive()
-	needCountToken := constant.CountToken
+	// The configured group limit is checked before any upstream call or quota
+	// pre-consumption. Only text-generation endpoints have a prompt context.
+	limitGroup := relayInfo.UsingGroup
+	if limitGroup == "" {
+		limitGroup = relayInfo.TokenGroup
+	}
+	if autoGroup := c.GetString("auto_group"); autoGroup != "" {
+		limitGroup = autoGroup
+	}
+	inputLimit := model_setting.GetMaxInputTokens(limitGroup)
+	// An auto-group retry can switch billing groups after this check. Apply the
+	// strictest configured limit among eligible groups to the entire request,
+	// so a retry cannot bypass the destination group's ceiling.
+	if relayInfo.UsingGroup == "auto" || (relayInfo.UsingGroup == "" && relayInfo.TokenGroup == "auto") {
+		for _, group := range service.GetUserAutoGroup(relayInfo.UserGroup) {
+			if candidate := model_setting.GetMaxInputTokens(group); candidate > 0 && (inputLimit == 0 || candidate < inputLimit) {
+				inputLimit = candidate
+				limitGroup = "auto"
+			}
+		}
+	}
+	limitApplies := inputLimit > 0 && isInputLimitRelay(relayFormat, relayInfo.RelayMode)
+	if limitApplies {
+		// Stateful Responses requests can carry earlier context that is absent
+		// from this request body. A local token estimate cannot safely guard it.
+		var hiddenContext bool
+		switch r := request.(type) {
+		case *dto.OpenAIResponsesRequest:
+			hiddenContext = r.PreviousResponseID != "" || len(r.Conversation) > 0 || len(r.Prompt) > 0
+		case *dto.OpenAIResponsesCompactionRequest:
+			hiddenContext = r.PreviousResponseID != ""
+		}
+		if hiddenContext {
+			newAPIError = types.NewErrorWithStatusCode(
+				errors.New("this group has an input context limit; previous_response_id, conversation and stored prompts cannot be measured locally"),
+				types.ErrorCodeInvalidRequest,
+				http.StatusBadRequest,
+				types.ErrOptionWithSkipRetry(),
+			)
+			return
+		}
+	}
+	needCountToken := constant.CountToken || limitApplies
 	// Avoid building huge CombineText (strings.Join) when token counting and sensitive check are both disabled.
 	var meta *types.TokenCountMeta
 	if needSensitiveCheck || needCountToken {
@@ -142,9 +198,23 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		}
 	}
 
-	tokens, err := service.EstimateRequestToken(c, meta, relayInfo)
+	var tokens int
+	if limitApplies {
+		tokens, err = service.EstimateRequestTokenForLimit(c, meta, relayInfo)
+	} else {
+		tokens, err = service.EstimateRequestToken(c, meta, relayInfo)
+	}
 	if err != nil {
 		newAPIError = types.NewError(err, types.ErrorCodeCountTokenFailed)
+		return
+	}
+	if limitApplies && tokens > inputLimit {
+		newAPIError = types.NewErrorWithStatusCode(
+			fmt.Errorf("input context exceeds the %d token limit for group %s (estimated %d tokens)", inputLimit, limitGroup, tokens),
+			types.ErrorCodeInputTokenLimitExceeded,
+			http.StatusBadRequest,
+			types.ErrOptionWithSkipRetry(),
+		)
 		return
 	}
 

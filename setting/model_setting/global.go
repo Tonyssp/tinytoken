@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/setting/config"
 )
 
@@ -34,6 +35,7 @@ func (p ChatCompletionsToResponsesPolicy) IsChannelEnabled(channelID int, channe
 
 type GlobalSettings struct {
 	PassThroughRequestEnabled        bool                             `json:"pass_through_request_enabled"`
+	MaxInputTokensByGroup            map[string]int                   `json:"max_input_tokens_by_group"`
 	ThinkingModelBlacklist           []string                         `json:"thinking_model_blacklist"`
 	ChatCompletionsToResponsesPolicy ChatCompletionsToResponsesPolicy `json:"chat_completions_to_responses_policy"`
 }
@@ -41,6 +43,7 @@ type GlobalSettings struct {
 // 默认配置
 var defaultOpenaiSettings = GlobalSettings{
 	PassThroughRequestEnabled: false,
+	MaxInputTokensByGroup:     map[string]int{},
 	ThinkingModelBlacklist: []string{
 		"moonshotai/kimi-k2-thinking",
 		"kimi-k2-thinking",
@@ -61,6 +64,14 @@ func init() {
 
 func GetGlobalSettings() *GlobalSettings {
 	return &globalSettings
+}
+
+// GetMaxInputTokens returns the per-request input limit for a billing group.
+// Zero means that the group is not limited.
+func GetMaxInputTokens(group string) int {
+	common.OptionMapRWMutex.RLock()
+	defer common.OptionMapRWMutex.RUnlock()
+	return globalSettings.MaxInputTokensByGroup[group]
 }
 
 // ShouldPreserveThinkingSuffix 判断模型是否配置为保留 thinking/-nothinking/-low/-high/-medium 后缀

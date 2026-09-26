@@ -35,16 +35,37 @@ function formatJsonForEditor(value: string, fallback: string) {
   }
 }
 
+function parseInputLimits(value: string) {
+  try {
+    const parsed = JSON.parse(value || '{}') as Record<string, number>
+    return Object.entries(parsed).map(([group, limit]) => ({ group, limit }))
+  } catch {
+    return []
+  }
+}
+
+function parseGroupNames(value: string) {
+  try {
+    return Object.keys(JSON.parse(value || '{}') as Record<string, number>)
+  } catch {
+    return []
+  }
+}
+
 const MODELS_SECTIONS = [
   {
     id: 'global',
     titleKey: 'Global Model Configuration',
     build: (settings: ModelSettings) => (
       <GlobalSettingsCard
+        availableGroups={parseGroupNames(settings.GroupRatio)}
         defaultValues={{
           global: {
             pass_through_request_enabled:
               settings['global.pass_through_request_enabled'],
+            max_input_tokens_by_group: parseInputLimits(
+              settings['global.max_input_tokens_by_group']
+            ),
             thinking_model_blacklist: formatJsonForEditor(
               settings['global.thinking_model_blacklist'],
               '[]'

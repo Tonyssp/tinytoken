@@ -4651,6 +4651,10 @@
     "Send this method slips to its own Telegram group": "ส่งสลิปของช่องทางนี้ไปยังกลุ่ม Telegram ของตัวเอง",
     "Send this method notices to its own LINE group": "ส่งแจ้งเตือนของช่องทางนี้ไปยังกลุ่ม LINE ของตัวเอง",
     "Optional per-method webhook secret": "รหัสลับ webhook เฉพาะช่องทางนี้ (ไม่บังคับ)",
-    "Leave blank to use the global secret or automatic token hash.": "เว้นว่างเพื่อใช้รหัสลับส่วนกลาง หรือให้ระบบสร้างจาก token อัตโนมัติ"
+    "Leave blank to use the global secret or automatic token hash.": "เว้นว่างเพื่อใช้รหัสลับส่วนกลาง หรือให้ระบบสร้างจาก token อัตโนมัติ",
+    "Maximum input context by group": "จำกัดอินพุตสูงสุดแยกตามกลุ่ม",
+    "Reject requests before upstream when estimated input tokens exceed the group limit. Leave a group out to disable its limit. For a 272K pricing threshold, 250000 gives a safety buffer. Cached input is included; output tokens are not.": "ปฏิเสธคำขอก่อนส่งต้นทางเมื่ออินพุตที่ประเมินเกินค่าจำกัดของกลุ่ม กลุ่มที่ไม่ระบุจะไม่ถูกจำกัด หากต้นทางขึ้นราคาเมื่อเกิน 272K แนะนำตั้ง 250000 เพื่อเผื่อความคลาดเคลื่อน นับอินพุตที่อ่านจากแคชด้วย แต่ไม่นับเอาต์พุต",
+    "Max input tokens": "อินพุตโทเค็นสูงสุด",
+    "Add group limit": "เพิ่มขีดจำกัดกลุ่ม"
   }
 }

@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useEffect } from 'react'
 import * as z from 'zod'
-import { useForm } from 'react-hook-form'
+import { useFieldArray, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -88,6 +88,26 @@ const jsonString = z.string().refine((value) => {
 const schema = z.object({
   global: z.object({
     pass_through_request_enabled: z.boolean(),
+    max_input_tokens_by_group: z
+      .array(
+        z.object({
+          group: z.string().trim().min(1),
+          limit: z.coerce.number<number>().int().min(1).max(10_000_000),
+        })
+      )
+      .superRefine((rows, ctx) => {
+        const names = new Set<string>()
+        rows.forEach((row, index) => {
+          if (names.has(row.group)) {
+            ctx.addIssue({
+              code: 'custom',
+              message: 'Duplicate group',
+              path: [index, 'group'],
+            })
+          }
+          names.add(row.group)
+        })
+      }),
     thinking_model_blacklist: jsonString,
     chat_completions_to_responses_policy: jsonString,
   }),
@@ -102,6 +122,7 @@ type GlobalModelSettingsFormInput = z.input<typeof schema>
 
 type FlatGlobalModelSettings = {
   'global.pass_through_request_enabled': boolean
+  'global.max_input_tokens_by_group': string
   'global.thinking_model_blacklist': string
   'global.chat_completions_to_responses_policy': string
   'general_setting.ping_interval_enabled': boolean
@@ -113,6 +134,14 @@ const flattenGlobalValues = (
 ): FlatGlobalModelSettings => ({
   'global.pass_through_request_enabled':
     values.global.pass_through_request_enabled,
+  'global.max_input_tokens_by_group': JSON.stringify(
+    Object.fromEntries(
+      values.global.max_input_tokens_by_group.map(({ group, limit }) => [
+        group,
+        limit,
+      ])
+    )
+  ),
   'global.thinking_model_blacklist': normalizeJsonText(
     values.global.thinking_model_blacklist,
     '[]'
@@ -134,9 +163,13 @@ function normalizeJsonText(value: string, fallback: string) {
 
 type GlobalSettingsCardProps = {
   defaultValues: GlobalModelSettingsFormValues
+  availableGroups: string[]
 }
 
-export function GlobalSettingsCard({ defaultValues }: GlobalSettingsCardProps) {
+export function GlobalSettingsCard({
+  defaultValues,
+  availableGroups,
+}: GlobalSettingsCardProps) {
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
 
@@ -152,6 +185,11 @@ export function GlobalSettingsCard({ defaultValues }: GlobalSettingsCardProps) {
   useEffect(() => {
     form.reset(defaultValues as GlobalModelSettingsFormInput)
   }, [defaultValues, form])
+
+  const inputLimits = useFieldArray({
+    control: form.control,
+    name: 'global.max_input_tokens_by_group',
+  })
 
   const pingEnabled = form.watch('general_setting.ping_interval_enabled')
 
@@ -221,6 +259,85 @@ export function GlobalSettingsCard({ defaultValues }: GlobalSettingsCardProps) {
               </SettingsSwitchItem>
             )}
           />
+
+          <div className='space-y-3 rounded-lg border p-4'>
+            <div>
+              <h3 className='text-base font-semibold'>
+                {t('Maximum input context by group')}
+              </h3>
+              <p className='text-muted-foreground mt-1 text-sm'>
+                {t(
+                  'Reject requests before upstream when estimated input tokens exceed the group limit. Leave a group out to disable its limit. For a 272K pricing threshold, 250000 gives a safety buffer. Cached input is included; output tokens are not.'
+                )}
+              </p>
+            </div>
+            <datalist id='input-limit-groups'>
+              {availableGroups.map((group) => (
+                <option key={group} value={group} />
+              ))}
+            </datalist>
+            {inputLimits.fields.map((row, index) => (
+              <div key={row.id} className='flex flex-wrap items-start gap-2'>
+                <FormField
+                  control={form.control}
+                  name={`global.max_input_tokens_by_group.${index}.group`}
+                  render={({ field }) => (
+                    <FormItem className='min-w-36 flex-1'>
+                      <FormLabel>{t('Group')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          list='input-limit-groups'
+                          placeholder='ChatGPT&Codex'
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name={`global.max_input_tokens_by_group.${index}.limit`}
+                  render={({ field }) => (
+                    <FormItem className='w-44'>
+                      <FormLabel>{t('Max input tokens')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          type='number'
+                          min={1}
+                          max={10_000_000}
+                          step={1}
+                          value={field.value ?? ''}
+                          onChange={(event) =>
+                            field.onChange(event.target.value)
+                          }
+                          onBlur={field.onBlur}
+                          name={field.name}
+                          ref={field.ref}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button
+                  type='button'
+                  variant='outline'
+                  className='mt-7'
+                  onClick={() => inputLimits.remove(index)}
+                >
+                  {t('Remove')}
+                </Button>
+              </div>
+            ))}
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => inputLimits.append({ group: '', limit: 250000 })}
+            >
+              {t('Add group limit')}
+            </Button>
+          </div>
 
           <FormField
             control={form.control}

@@ -150,6 +150,18 @@ func UpdateOption(c *gin.Context) {
 		}
 	}
 	switch option.Key {
+	case "global.max_input_tokens_by_group":
+		var limits map[string]int
+		if err = common.Unmarshal([]byte(option.Value.(string)), &limits); err != nil {
+			common.ApiErrorMsg(c, "Invalid group input-token limits JSON")
+			return
+		}
+		for group, limit := range limits {
+			if strings.TrimSpace(group) == "" || limit < 1 || limit > 10000000 {
+				common.ApiErrorMsg(c, "Each group needs a name and an input-token limit from 1 to 10,000,000")
+				return
+			}
+		}
 	case "GitHubOAuthEnabled":
 		if option.Value == "true" && common.GitHubClientId == "" {
 			c.JSON(http.StatusOK, gin.H{
