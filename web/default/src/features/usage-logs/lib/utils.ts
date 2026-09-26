@@ -211,13 +211,22 @@ export function buildApiParams(config: {
     ...(isAdmin && searchParams.username
       ? { username: String(searchParams.username) }
       : {}),
+    ...(isAdmin && searchParams.ip ? { ip: String(searchParams.ip) } : {}),
+    ...(isAdmin && searchParams.country
+      ? { country: String(searchParams.country) }
+      : {}),
     ...(searchParams.requestId
       ? { request_id: String(searchParams.requestId) }
       : {}),
     ...(searchParams.upstreamRequestId
       ? { upstream_request_id: String(searchParams.upstreamRequestId) }
       : {}),
-    ...buildTimeRangeParams(searchParams, false),
+    ...(isAdmin &&
+    typeof searchParams.username === 'string' &&
+    searchParams.username.trim() &&
+    searchParams.allTime === true
+      ? {}
+      : buildTimeRangeParams(searchParams, false)),
   }
 
   // Override with column filters if present

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -50,6 +51,8 @@ type Log struct {
 	TokenId           int    `json:"token_id" gorm:"default:0;index"`
 	Group             string `json:"group" gorm:"index"`
 	Ip                string `json:"ip" gorm:"index;default:''"`
+	Country           string `json:"country" gorm:"type:varchar(2);default:''"`
+	RequestPath       string `json:"request_path" gorm:"type:varchar(128);default:''"`
 	RequestId         string `json:"request_id,omitempty" gorm:"type:varchar(64);index:idx_logs_request_id;default:''"`
 	UpstreamRequestId string `json:"upstream_request_id,omitempty" gorm:"type:varchar(128);index:idx_logs_upstream_request_id;default:''"`
 	Other             string `json:"other"`
@@ -83,6 +86,32 @@ func formatUserLogs(logs []*Log, startIdx int) {
 		logs[i].Other = common.MapToJsonStr(otherMap)
 		logs[i].Id = startIdx + i + 1
 	}
+}
+
+var countryCodePattern = regexp.MustCompile(`^[A-Z]{2}$`)
+
+func requestLocation(c *gin.Context) (string, string, string) {
+	if c == nil || c.Request == nil {
+		return "", "", ""
+	}
+	country := strings.ToUpper(strings.TrimSpace(c.GetHeader("CF-IPCountry")))
+	if !countryCodePattern.MatchString(country) || country == "XX" || country == "T1" {
+		country = ""
+	}
+	path := c.Request.URL.Path
+	if len(path) > 128 {
+		path = path[:128]
+	}
+	return c.ClientIP(), country, path
+}
+
+func recordedRequestLocation(c *gin.Context, userId int) (string, string, string) {
+	ip, country, path := requestLocation(c)
+	settingMap, err := GetUserSetting(userId, false)
+	if err != nil || !settingMap.RecordIpLog {
+		return "", "", path
+	}
+	return ip, country, path
 }
 
 func GetLogByTokenId(tokenId int) (logs []*Log, err error) {
@@ -236,13 +265,7 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 	requestId := c.GetString(common.RequestIdKey)
 	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
 	otherStr := common.MapToJsonStr(other)
-	// 判断是否需要记录 IP
-	needRecordIp := false
-	if settingMap, err := GetUserSetting(userId, false); err == nil {
-		if settingMap.RecordIpLog {
-			needRecordIp = true
-		}
-	}
+	ip, country, path := recordedRequestLocation(c, userId)
 	log := &Log{
 		UserId:           userId,
 		Username:         username,
@@ -259,12 +282,9 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 		UseTime:          useTimeSeconds,
 		IsStream:         isStream,
 		Group:            group,
-		Ip: func() string {
-			if needRecordIp {
-				return c.ClientIP()
-			}
-			return ""
-		}(),
+		Ip:                ip,
+		Country:           country,
+		RequestPath:       path,
 		RequestId:         requestId,
 		UpstreamRequestId: upstreamRequestId,
 		Other:             otherStr,
@@ -299,13 +319,7 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	requestId := c.GetString(common.RequestIdKey)
 	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
 	otherStr := common.MapToJsonStr(params.Other)
-	// 判断是否需要记录 IP
-	needRecordIp := false
-	if settingMap, err := GetUserSetting(userId, false); err == nil {
-		if settingMap.RecordIpLog {
-			needRecordIp = true
-		}
-	}
+	ip, country, path := recordedRequestLocation(c, userId)
 	log := &Log{
 		UserId:           userId,
 		Username:         username,
@@ -322,12 +336,9 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 		UseTime:          params.UseTimeSeconds,
 		IsStream:         params.IsStream,
 		Group:            params.Group,
-		Ip: func() string {
-			if needRecordIp {
-				return c.ClientIP()
-			}
-			return ""
-		}(),
+		Ip:                ip,
+		Country:           country,
+		RequestPath:       path,
 		RequestId:         requestId,
 		UpstreamRequestId: upstreamRequestId,
 		Other:             otherStr,
@@ -386,7 +397,7 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 	}
 }
 
-func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, startIdx int, num int, channel int, group string, requestId string, upstreamRequestId string) (logs []*Log, total int64, err error) {
+func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, startIdx int, num int, channel int, group string, requestId string, upstreamRequestId string, ip string, country string) (logs []*Log, total int64, err error) {
 	var tx *gorm.DB
 	if logType == LogTypeUnknown {
 		tx = LOG_DB
@@ -408,6 +419,12 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 	}
 	if upstreamRequestId != "" {
 		tx = tx.Where("logs.upstream_request_id = ?", upstreamRequestId)
+	}
+	if ip != "" {
+		tx = tx.Where("logs.ip = ?", ip)
+	}
+	if country != "" {
+		tx = tx.Where("logs.country = ?", strings.ToUpper(country))
 	}
 	if startTimestamp != 0 {
 		tx = tx.Where("logs.created_at >= ?", startTimestamp)

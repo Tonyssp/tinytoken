@@ -22,7 +22,7 @@ func GetAllLogs(c *gin.Context) {
 	group := c.Query("group")
 	requestId := c.Query("request_id")
 	upstreamRequestId := c.Query("upstream_request_id")
-	logs, total, err := model.GetAllLogs(logType, startTimestamp, endTimestamp, modelName, username, tokenName, pageInfo.GetStartIdx(), pageInfo.GetPageSize(), channel, group, requestId, upstreamRequestId)
+	logs, total, err := model.GetAllLogs(logType, startTimestamp, endTimestamp, modelName, username, tokenName, pageInfo.GetStartIdx(), pageInfo.GetPageSize(), channel, group, requestId, upstreamRequestId, c.Query("ip"), c.Query("country"))
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -53,6 +53,29 @@ func GetUserLogs(c *gin.Context) {
 	pageInfo.SetItems(logs)
 	common.ApiSuccess(c, pageInfo)
 	return
+}
+
+func GetUsageSummary(c *gin.Context) {
+	getUsageSummary(c, 0, c.Query("username"))
+}
+
+func GetSelfUsageSummary(c *gin.Context) {
+	getUsageSummary(c, c.GetInt("id"), "")
+}
+
+func getUsageSummary(c *gin.Context, userId int, username string) {
+	start, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
+	end, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
+	if start > 0 && end > 0 && start > end {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "invalid time range"})
+		return
+	}
+	summary, err := model.GetUsageSummary(userId, username, start, end)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, summary)
 }
 
 // Deprecated: SearchAllLogs 已废弃，前端未使用该接口。

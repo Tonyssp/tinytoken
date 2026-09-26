@@ -29,6 +29,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Input } from '@/components/ui/input'
 import { deleteUser } from '../api'
 import { ERROR_MESSAGES } from '../constants'
 import { getUserActionMessage } from '../lib'
@@ -38,6 +39,7 @@ export function UsersDeleteDialog() {
   const { t } = useTranslation()
   const { open, setOpen, currentRow, triggerRefresh } = useUsers()
   const [isDeleting, setIsDeleting] = useState(false)
+  const [confirmation, setConfirmation] = useState('')
 
   const handleDelete = async () => {
     if (!currentRow) return
@@ -47,6 +49,7 @@ export function UsersDeleteDialog() {
       const result = await deleteUser(currentRow.id)
       if (result.success) {
         toast.success(t(getUserActionMessage('delete')))
+        setConfirmation('')
         setOpen(null)
         triggerRefresh()
       } else {
@@ -62,7 +65,12 @@ export function UsersDeleteDialog() {
   return (
     <AlertDialog
       open={open === 'delete'}
-      onOpenChange={(open) => !open && setOpen(null)}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          setConfirmation('')
+          setOpen(null)
+        }
+      }}
     >
       <AlertDialogContent>
         <AlertDialogHeader>
@@ -72,6 +80,13 @@ export function UsersDeleteDialog() {
             <span className='font-semibold'>{currentRow?.username}</span>
             {t('. This action cannot be undone.')}
           </AlertDialogDescription>
+          <Input
+            value={confirmation}
+            onChange={(event) => setConfirmation(event.target.value)}
+            placeholder={currentRow?.username || ''}
+            aria-label={t('Type the username to confirm deletion')}
+            autoComplete='off'
+          />
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isDeleting}>
@@ -79,7 +94,7 @@ export function UsersDeleteDialog() {
           </AlertDialogCancel>
           <AlertDialogAction
             onClick={handleDelete}
-            disabled={isDeleting}
+            disabled={isDeleting || confirmation !== currentRow?.username}
             className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
           >
             {isDeleting ? 'Deleting...' : 'Delete'}

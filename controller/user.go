@@ -837,7 +837,7 @@ func DeleteUser(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	originUser, err := model.GetUserById(id, false)
+	originUser, err := model.GetUserByIdIncludingDeleted(id)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -852,7 +852,7 @@ func DeleteUser(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	recordManageAuditFor(c, originUser.Id, "user.delete", map[string]interface{}{
+	recordManageAudit(c, "user.delete", map[string]interface{}{
 		"username": originUser.Username,
 		"id":       originUser.Id,
 	})

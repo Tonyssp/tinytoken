@@ -30,12 +30,14 @@ import {
   ModelCardGrid,
   ModelDetailsDrawer,
 } from './components'
+import { ModelPlaza } from './components/model-plaza'
 import { EXCLUDED_GROUPS, VIEW_MODES } from './constants'
 import { useFilters } from './hooks/use-filters'
 import { usePricingData } from './hooks/use-pricing-data'
 
 export function Pricing() {
   const { t } = useTranslation()
+  const [plazaView, setPlazaView] = useState(true)
   const [selectedModelName, setSelectedModelName] = useState<string | null>(
     null
   )
@@ -51,6 +53,16 @@ export function Pricing() {
     priceRate,
     usdExchangeRate,
   } = usePricingData()
+
+  const availableGroups = useMemo(
+    () =>
+      Object.keys(usableGroup).filter(
+        (group) =>
+          !EXCLUDED_GROUPS.includes(group) &&
+          Object.prototype.hasOwnProperty.call(groupRatio, group)
+      ),
+    [usableGroup, groupRatio]
+  )
 
   const {
     searchInput,
@@ -79,7 +91,7 @@ export function Pricing() {
     availableTags,
     clearFilters,
     clearSearch,
-  } = useFilters(models || [])
+  } = useFilters(models || [], availableGroups)
 
   const handleModelClick = useCallback((modelName: string) => {
     setSelectedModelName(modelName)
@@ -93,14 +105,6 @@ export function Pricing() {
           ) || null
         : null,
     [models, selectedModelName]
-  )
-
-  const availableGroups = useMemo(
-    () =>
-      Object.keys(usableGroup || {}).filter(
-        (g) => !EXCLUDED_GROUPS.includes(g)
-      ),
-    [usableGroup]
   )
 
   const handleClearAll = useCallback(() => {
@@ -154,6 +158,47 @@ export function Pricing() {
     )
   }
 
+  if (plazaView) {
+    return (
+      <PublicLayout showMainContainer={false}>
+        <ModelPlaza
+          models={models || []}
+          vendors={vendors || []}
+          groupRatio={groupRatio || {}}
+          priceRate={priceRate}
+          usdExchangeRate={usdExchangeRate}
+          tokenUnit={tokenUnit}
+          showRechargePrice={showRechargePrice}
+          onShowRechargePriceChange={setShowRechargePrice}
+          onModelClick={handleModelClick}
+          onClassicView={() => setPlazaView(false)}
+        />
+        {selectedModel && (
+          <ModelDetailsDrawer
+            open
+            onOpenChange={(open) => {
+              if (!open) setSelectedModelName(null)
+            }}
+            model={selectedModel}
+            groupRatio={groupRatio || {}}
+            usableGroup={usableGroup || {}}
+            endpointMap={
+              (endpointMap as Record<
+                string,
+                { path?: string; method?: string }
+              >) || {}
+            }
+            autoGroups={autoGroups || []}
+            priceRate={priceRate ?? 1}
+            usdExchangeRate={usdExchangeRate ?? 1}
+            tokenUnit={tokenUnit}
+            showRechargePrice={showRechargePrice}
+          />
+        )}
+      </PublicLayout>
+    )
+  }
+
   return (
     <PublicLayout showMainContainer={false}>
       <div className='relative overflow-x-hidden'>
@@ -173,6 +218,13 @@ export function Pricing() {
           }}
         />
         <PageTransition className='relative mx-auto w-full max-w-[1800px] px-3 pt-16 pb-8 sm:px-6 sm:pt-20 sm:pb-10 xl:px-8'>
+          <button
+            type='button'
+            className='text-muted-foreground mb-3 text-xs underline'
+            onClick={() => setPlazaView(true)}
+          >
+            {t('Grouped price view')}
+          </button>
           <header className='mx-auto mb-5 max-w-3xl pt-5 text-center sm:mb-10 sm:pt-10'>
             <h1 className='text-3xl leading-tight font-bold tracking-normal sm:text-5xl'>
               {t('Model Square')}

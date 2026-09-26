@@ -18,8 +18,11 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useCallback, useMemo } from 'react'
 import { getRouteApi, useNavigate } from '@tanstack/react-router'
+import { ArrowLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useSidebarConfig } from '@/hooks/use-sidebar-config'
+import { useIsAdmin } from '@/hooks/use-admin'
+import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SectionPageLayout } from '@/components/layout'
 import type { NavGroup } from '@/components/layout/types'
@@ -30,6 +33,7 @@ import {
   useUsageLogsContext,
 } from './components/usage-logs-provider'
 import { UsageLogsTable } from './components/usage-logs-table'
+import { UsageRecordsOverview } from './components/usage-records-overview'
 import {
   isUsageLogsSectionId,
   USAGE_LOGS_DEFAULT_SECTION,
@@ -41,7 +45,7 @@ const TASK_LOG_SECTIONS = ['drawing', 'task'] as const
 
 const SECTION_META: Record<UsageLogsSectionId, { titleKey: string }> = {
   common: {
-    titleKey: 'Common Logs',
+    titleKey: 'Usage records',
   },
   drawing: {
     titleKey: 'Drawing Logs',
@@ -54,7 +58,9 @@ const SECTION_META: Record<UsageLogsSectionId, { titleKey: string }> = {
 function UsageLogsContent() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const isAdmin = useIsAdmin()
   const params = route.useParams()
+  const search = route.useSearch()
   const activeCategory: UsageLogsSectionId =
     params.section && isUsageLogsSectionId(params.section)
       ? params.section
@@ -107,15 +113,37 @@ function UsageLogsContent() {
     activeCategory === 'common' ? SECTION_META.common : SECTION_META.task
   const showTaskSwitcher =
     activeCategory !== 'common' && visibleSections.length > 1
+  const activeUsername =
+    isAdmin && activeCategory === 'common' && search.allTime
+      ? search.username?.trim()
+      : undefined
+
+  const handleViewUserRecords = useCallback(
+    (username: string) => {
+      setUserInfoDialogOpen(false)
+      void navigate({
+        to: '/usage-logs/$section',
+        params: { section: 'common' },
+        search: { username, allTime: true, page: 1, type: ['0'] },
+      })
+    },
+    [navigate, setUserInfoDialogOpen]
+  )
 
   return (
     <>
-      <SectionPageLayout fixedContent>
+      <SectionPageLayout fixedContent={activeCategory !== 'common'}>
         <SectionPageLayout.Title>
           {t(pageMeta.titleKey)}
         </SectionPageLayout.Title>
         <SectionPageLayout.Content>
-          <div className='flex h-full min-h-0 flex-col gap-4'>
+          <div
+            className={
+              activeCategory === 'common'
+                ? 'space-y-5'
+                : 'flex h-full min-h-0 flex-col gap-4'
+            }
+          >
             {showTaskSwitcher && (
               <Tabs value={activeCategory} onValueChange={handleSectionChange}>
                 <TabsList className='max-w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto'>
@@ -127,7 +155,48 @@ function UsageLogsContent() {
                 </TabsList>
               </Tabs>
             )}
-            <div className='min-h-0 flex-1'>
+            {activeCategory === 'common' && !activeUsername && (
+              <UsageRecordsOverview />
+            )}
+            {activeUsername && (
+              <div className='bg-background flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3'>
+                <div className='min-w-0'>
+                  <p className='text-sm font-semibold break-all'>
+                    {t('All records for {{username}}', {
+                      username: activeUsername,
+                    })}
+                  </p>
+                  <p className='text-muted-foreground text-xs'>
+                    {t('All time')}
+                  </p>
+                </div>
+                <Button
+                  type='button'
+                  size='sm'
+                  variant='outline'
+                  onClick={() => {
+                    void navigate({
+                      to: '/usage-logs/$section',
+                      params: { section: 'common' },
+                      search: { page: 1 },
+                    })
+                  }}
+                >
+                  <ArrowLeft className='size-4' />
+                  {t('Back to all users')}
+                </Button>
+              </div>
+            )}
+            <div
+              className={
+                activeCategory === 'common' ? 'min-w-0' : 'min-h-0 flex-1'
+              }
+            >
+              {activeCategory === 'common' && (
+                <h3 className='mb-3 text-sm font-semibold'>
+                  {t('Usage records')}
+                </h3>
+              )}
               <UsageLogsTable logCategory={activeCategory} />
             </div>
           </div>
@@ -138,6 +207,7 @@ function UsageLogsContent() {
         userId={selectedUserId}
         open={userInfoDialogOpen}
         onOpenChange={setUserInfoDialogOpen}
+        onViewRecords={handleViewUserRecords}
       />
 
       <CacheStatsDialog

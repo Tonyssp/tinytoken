@@ -204,14 +204,14 @@ func GetAllUsers(pageInfo *common.PageInfo) (users []*User, total int64, err err
 	}()
 
 	// Get total count within transaction
-	err = tx.Unscoped().Model(&User{}).Count(&total).Error
+	err = tx.Model(&User{}).Count(&total).Error
 	if err != nil {
 		tx.Rollback()
 		return nil, 0, err
 	}
 
 	// Get paginated users within same transaction
-	err = tx.Unscoped().Order("id desc").Limit(pageInfo.GetPageSize()).Offset(pageInfo.GetStartIdx()).Omit("password").Find(&users).Error
+	err = tx.Order("id desc").Limit(pageInfo.GetPageSize()).Offset(pageInfo.GetStartIdx()).Omit("password").Find(&users).Error
 	if err != nil {
 		tx.Rollback()
 		return nil, 0, err
@@ -242,7 +242,10 @@ func SearchUsers(keyword string, group string, role *int, status *int, startIdx 
 	}()
 
 	// 构建基础查询
-	query := tx.Unscoped().Model(&User{})
+	query := tx.Model(&User{})
+	if status != nil && *status == -1 {
+		query = tx.Unscoped().Model(&User{}).Where("deleted_at IS NOT NULL")
+	}
 
 	// 构建搜索条件
 	likeCondition := "username LIKE ? OR email LIKE ? OR display_name LIKE ?"
@@ -263,12 +266,8 @@ func SearchUsers(keyword string, group string, role *int, status *int, startIdx 
 	if role != nil {
 		query = query.Where("role = ?", *role)
 	}
-	if status != nil {
-		if *status == -1 {
-			query = query.Where("deleted_at IS NOT NULL")
-		} else {
-			query = query.Where("deleted_at IS NULL").Where("status = ?", *status)
-		}
+	if status != nil && *status != -1 {
+		query = query.Where("status = ?", *status)
 	}
 
 	// 获取总数
@@ -307,6 +306,15 @@ func GetUserById(id int, selectAll bool) (*User, error) {
 	return &user, err
 }
 
+func GetUserByIdIncludingDeleted(id int) (*User, error) {
+	if id == 0 {
+		return nil, errors.New("invalid user id")
+	}
+	var user User
+	err := DB.Unscoped().Omit("password").First(&user, "id = ?", id).Error
+	return &user, err
+}
+
 func GetUserIdByAffCode(affCode string) (int, error) {
 	if affCode == "" {
 		return 0, errors.New("affCode 为空！")
@@ -328,8 +336,10 @@ func HardDeleteUserById(id int) error {
 	if id == 0 {
 		return errors.New("id 为空！")
 	}
-	err := DB.Unscoped().Delete(&User{}, "id = ?", id).Error
-	return err
+	if err := DB.Unscoped().Delete(&User{}, "id = ?", id).Error; err != nil {
+		return err
+	}
+	return invalidateUserCache(id)
 }
 
 func inviteUser(inviterId int) (err error) {

@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -117,6 +117,7 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   tokenKey: string
+  keyGroup?: string
 }
 
 export function CCSwitchDialog(props: Props) {
@@ -124,6 +125,7 @@ export function CCSwitchDialog(props: Props) {
   const [app, setApp] = useState<AppType>('claude')
   const [name, setName] = useState<string>(APP_CONFIGS.claude.defaultName)
   const [models, setModels] = useState<Record<string, string>>({})
+  const appChangedByUser = useRef(false)
 
   const modelsEndpoint = getModelsEndpoint()
   const { data: tokenModelsData, isFetching: tokenModelsFetching } = useQuery({
@@ -155,18 +157,48 @@ export function CCSwitchDialog(props: Props) {
 
   useEffect(() => {
     if (props.open) {
+      appChangedByUser.current = false
+      const preferredApp: AppType = /gemini/i.test(props.keyGroup || '')
+        ? 'gemini'
+        : /(?:codex|chatgpt|gpt)/i.test(props.keyGroup || '')
+          ? 'codex'
+          : 'claude'
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setModels({})
 
-      setApp('claude')
+      setApp(preferredApp)
 
-      setName(APP_CONFIGS.claude.defaultName)
+      setName(APP_CONFIGS[preferredApp].defaultName)
     }
-  }, [props.open])
+  }, [props.open, props.keyGroup])
+
+  useEffect(() => {
+    if (
+      !props.open ||
+      appChangedByUser.current ||
+      !tokenModelsData?.models?.length
+    )
+      return
+    if (/(?:claude|codex|chatgpt|gpt|gemini)/i.test(props.keyGroup || ''))
+      return
+    const detected = (Object.keys(APP_MODEL_PATTERNS) as AppType[]).find(
+      (candidate) =>
+        tokenModelsData.models.some((model) =>
+          APP_MODEL_PATTERNS[candidate].test(model)
+        )
+    )
+    if (detected && detected !== app) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setApp(detected)
+      setName(APP_CONFIGS[detected].defaultName)
+    }
+  }, [props.open, props.keyGroup, tokenModelsData?.models, app])
 
   const currentConfig = APP_CONFIGS[app]
+  const primaryModel = models.model || modelOptions[0]?.value || ''
 
   const handleAppChange = (val: string) => {
+    appChangedByUser.current = true
     const appVal = val as AppType
     setApp(appVal)
     setName(APP_CONFIGS[appVal].defaultName)
@@ -174,14 +206,19 @@ export function CCSwitchDialog(props: Props) {
   }
 
   const handleSubmit = () => {
-    if (!models.model) {
+    if (!primaryModel) {
       toast.warning(t('Please select a primary model'))
       return
     }
     const key = props.tokenKey.startsWith('sk-')
       ? props.tokenKey
       : `sk-${props.tokenKey}`
-    const url = buildCCSwitchURL(app, name, models, key)
+    const url = buildCCSwitchURL(
+      app,
+      name,
+      { ...models, model: primaryModel },
+      key
+    )
     window.open(url, '_blank')
     props.onOpenChange(false)
   }
@@ -249,7 +286,9 @@ export function CCSwitchDialog(props: Props) {
             </Label>
             <ComboboxInput
               options={modelOptions}
-              value={models[field.key] || ''}
+              value={
+                field.key === 'model' ? primaryModel : models[field.key] || ''
+              }
               onValueChange={(v) =>
                 setModels((prev) => ({ ...prev, [field.key]: v }))
               }

@@ -24,10 +24,12 @@ const (
 )
 
 type Monitor struct {
-	Name   string  `json:"name"`
-	Uptime float64 `json:"uptime"`
-	Status int     `json:"status"`
-	Group  string  `json:"group,omitempty"`
+	Name            string  `json:"name"`
+	Uptime          float64 `json:"uptime"`
+	Status          int     `json:"status"`
+	Group           string  `json:"group,omitempty"`
+	UptimeAvailable bool    `json:"uptimeAvailable"`
+	History         []int   `json:"history,omitempty"`
 }
 
 type UptimeGroupResult struct {
@@ -107,18 +109,23 @@ func fetchGroupData(ctx context.Context, client *http.Client, groupConfig map[st
 
 		for _, m := range pg.MonitorList {
 			monitor := Monitor{
-				Name:  m.Name,
-				Group: pg.Name,
+				Name:   m.Name,
+				Group:  pg.Name,
+				Status: -1,
 			}
 
 			monitorID := strconv.Itoa(m.ID)
 
 			if uptime, exists := heartbeatData.UptimeList[monitorID+uptimeKeySuffix]; exists {
 				monitor.Uptime = uptime
+				monitor.UptimeAvailable = true
 			}
 
 			if heartbeats, exists := heartbeatData.HeartbeatList[monitorID]; exists && len(heartbeats) > 0 {
 				monitor.Status = heartbeats[0].Status
+				for index := min(len(heartbeats), 18) - 1; index >= 0; index-- {
+					monitor.History = append(monitor.History, heartbeats[index].Status)
+				}
 			}
 
 			result.Monitors = append(result.Monitors, monitor)

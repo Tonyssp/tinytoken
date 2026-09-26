@@ -466,8 +466,51 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
   }
 
   columns.push({
+    accessorKey: 'request_path',
+    header: t('Endpoint'),
+    cell: ({ row }) => {
+      const path =
+        row.original.request_path ||
+        parseLogOther(row.original.other)?.request_path ||
+        ''
+      return (
+        <span
+          className='block max-w-40 truncate font-mono text-xs'
+          title={path}
+        >
+          {path || '—'}
+        </span>
+      )
+    },
+  })
+
+  columns.push(
+    {
+      accessorKey: 'ip',
+      header: t('IP address'),
+      cell: function IpCell({ row }) {
+        const { sensitiveVisible } = useUsageLogsContext()
+        const ip = row.original.ip
+        return (
+          <span
+            className='font-mono text-xs'
+            title={sensitiveVisible ? ip : undefined}
+          >
+            {ip ? (sensitiveVisible ? ip : '••••') : '—'}
+          </span>
+        )
+      },
+    },
+    {
+      accessorKey: 'country',
+      header: t('Country'),
+      cell: ({ row }) => row.original.country || '—',
+    }
+  )
+
+  columns.push({
     accessorKey: 'token_name',
-    header: t('Token'),
+    header: t('API Key'),
     cell: function TokenNameCell({ row }) {
       const { sensitiveVisible } = useUsageLogsContext()
       const log = row.original
@@ -541,8 +584,45 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
       meta: { mobileTitle: true },
     },
     {
+      id: 'reasoning_effort',
+      header: t('Reasoning Effort'),
+      accessorFn: (row) => parseLogOther(row.other)?.reasoning_effort || '',
+      cell: ({ row }) =>
+        parseLogOther(row.original.other)?.reasoning_effort || '—',
+    },
+    {
+      accessorKey: 'group',
+      header: t('Group'),
+      cell: function GroupCell({ row }) {
+        const { sensitiveVisible } = useUsageLogsContext()
+        const group =
+          row.original.group || parseLogOther(row.original.other)?.group
+        return group ? (sensitiveVisible ? group : '••••') : '—'
+      },
+    },
+    {
+      id: 'request_type',
+      header: t('Type'),
+      accessorFn: (row) => row.is_stream,
+      cell: ({ row }) =>
+        row.original.type === 2
+          ? t(row.original.is_stream ? 'Stream' : 'Non-stream')
+          : t(getLogTypeConfig(row.original.type).label),
+    },
+    {
+      id: 'billing_mode',
+      header: t('Billing Mode'),
+      accessorFn: (row) => parseLogOther(row.other)?.billing_mode || '',
+      cell: ({ row }) => {
+        const other = parseLogOther(row.original.other)
+        return other?.billing_source === 'subscription'
+          ? t('Subscription')
+          : other?.billing_mode || '—'
+      },
+    },
+    {
       accessorKey: 'use_time',
-      header: t('Timing'),
+      header: t('Latency'),
       cell: ({ row }) => {
         const log = row.original
         if (!isTimingLogType(log.type)) return null
@@ -808,5 +888,30 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
     }
   )
 
-  return columns
+  const displayOrder = [
+    'token_name',
+    'user',
+    'channel',
+    'model_name',
+    'reasoning_effort',
+    'request_path',
+    'ip',
+    'country',
+    'group',
+    'request_type',
+    'billing_mode',
+    'prompt_tokens',
+    'quota',
+    'use_time',
+    'created_at',
+    'content',
+  ]
+
+  return displayOrder.flatMap((key) => {
+    const column = columns.find(
+      (item) =>
+        item.id === key || ('accessorKey' in item && item.accessorKey === key)
+    )
+    return column ? [column] : []
+  })
 }

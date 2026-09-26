@@ -78,6 +78,10 @@ export function useTopNavLinks(): TopNavLink[] {
     links.push({ title: t('Model Square'), href: '/pricing', requiresAuth })
   }
 
+  if (status?.uptime_kuma_enabled === true) {
+    links.push({ title: t('Channel status'), href: '/monitor' })
+  }
+
   // Docs (supports external links)
   if (modules?.docs !== false) {
     if (docsLink) {

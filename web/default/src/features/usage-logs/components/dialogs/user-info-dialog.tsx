@@ -16,11 +16,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useCallback, useEffect, useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { History, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { formatQuota, formatCompactNumber } from '@/lib/format'
+import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Dialog } from '@/components/dialog'
 import { getUserInfo } from '../../api'
@@ -30,56 +32,48 @@ interface UserInfoDialogProps {
   userId: number | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  onViewRecords?: (username: string) => void
+}
+
+function InfoItem({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className='space-y-1.5'>
+      <Label className='text-muted-foreground text-xs'>{label}</Label>
+      <div className='text-sm font-semibold'>{value}</div>
+    </div>
+  )
 }
 
 export function UserInfoDialog({
   userId,
   open,
   onOpenChange,
+  onViewRecords,
 }: UserInfoDialogProps) {
   const { t } = useTranslation()
-  const [userInfo, setUserInfo] = useState<UserInfo | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
-
-  const fetchUserInfo = useCallback(
-    async (id: number) => {
-      setIsLoading(true)
-      try {
-        const result = await getUserInfo(id)
-        if (result.success) {
-          setUserInfo(result.data || null)
-        } else {
-          toast.error(result.message || t('Failed to fetch user information'))
-        }
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Failed to fetch user info:', error)
-        toast.error(t('Failed to fetch user information'))
-      } finally {
-        setIsLoading(false)
+  const {
+    data: userInfo,
+    isLoading,
+    error,
+  } = useQuery<UserInfo | null>({
+    queryKey: ['usage-log-user-info', userId],
+    queryFn: async () => {
+      const result = await getUserInfo(userId!)
+      if (!result.success) {
+        throw new Error(result.message || '')
       }
+      return result.data || null
     },
-    [t]
-  )
+    enabled: open && userId != null,
+    staleTime: 30_000,
+    retry: false,
+  })
 
   useEffect(() => {
-    if (open && userId) {
-      fetchUserInfo(userId)
+    if (open && error) {
+      toast.error(error.message || t('Failed to fetch user information'))
     }
-  }, [open, userId, fetchUserInfo])
-
-  const InfoItem = ({
-    label,
-    value,
-  }: {
-    label: string
-    value: string | number
-  }) => (
-    <div className='space-y-1.5'>
-      <Label className='text-muted-foreground text-xs'>{label}</Label>
-      <div className='text-sm font-semibold'>{value}</div>
-    </div>
-  )
+  }, [open, error, t])
 
   return (
     <Dialog
@@ -172,6 +166,16 @@ export function UserInfoDialog({
                 {userInfo.remark}
               </div>
             </div>
+          )}
+          {onViewRecords && (
+            <Button
+              type='button'
+              className='w-full'
+              onClick={() => onViewRecords(userInfo.username)}
+            >
+              <History className='size-4' />
+              {t('View all user records')}
+            </Button>
           )}
         </div>
       ) : (

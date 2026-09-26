@@ -132,7 +132,19 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
   const isRoot = user.role === USER_ROLE.ROOT
 
   if (isUserDeleted(user)) {
-    return null
+    return (
+      <Button
+        variant='ghost'
+        size='icon'
+        className='text-destructive'
+        onClick={handleDelete}
+        disabled={isRoot}
+        aria-label={t('Permanently delete user')}
+        title={t('Permanently delete user')}
+      >
+        <Trash2 className='size-4' />
+      </Button>
+    )
   }
 
   return (

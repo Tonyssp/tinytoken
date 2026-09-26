@@ -33,6 +33,25 @@ export interface QuotaDataItem {
   quota?: number
 }
 
+export interface UsageSummaryGroup {
+  name: string
+  requests: number
+  tokens: number
+  quota: number
+}
+
+export interface UsageSummary {
+  totals: {
+    requests: number
+    tokens: number
+    quota: number
+    avg_seconds: number
+  }
+  models: UsageSummaryGroup[]
+  groups: UsageSummaryGroup[]
+  endpoints: UsageSummaryGroup[]
+}
+
 // ============================================================================
 // Uptime Monitoring Types
 // ============================================================================
@@ -42,6 +61,8 @@ export interface UptimeMonitor {
   uptime: number
   status: number
   group?: string
+  uptimeAvailable?: boolean
+  history?: number[]
 }
 
 export interface UptimeGroupResult {
