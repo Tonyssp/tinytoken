@@ -3,12 +3,14 @@ package model
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
 
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type TopUp struct {
@@ -88,7 +90,6 @@ func UpdatePendingTopUpStatus(tradeNo string, expectedPaymentProvider string, ta
 	if tradeNo == "" {
 		return errors.New("未提供支付单号")
 	}
-
 	refCol := "`trade_no`"
 	if common.UsingPostgreSQL {
 		refCol = `"trade_no"`
@@ -117,14 +118,9 @@ func RejectManualTopUp(tradeNo string) error {
 		return ErrTopUpNotFound
 	}
 
-	refCol := "`trade_no`"
-	if common.UsingPostgreSQL {
-		refCol = `"trade_no"`
-	}
-
 	return DB.Transaction(func(tx *gorm.DB) error {
 		topUp := &TopUp{}
-		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where(refCol+" = ?", tradeNo).First(topUp).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("trade_no = ?", tradeNo).First(topUp).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrTopUpNotFound
 			}
@@ -143,9 +139,15 @@ func RejectManualTopUp(tradeNo string) error {
 			return ErrTopUpStatusInvalid
 		}
 
-		topUp.Status = common.TopUpStatusFailed
-		topUp.CompleteTime = common.GetTimestamp()
-		return tx.Save(topUp).Error
+		result := tx.Model(&TopUp{}).Where("id = ? AND status = ?", topUp.Id, common.TopUpStatusPending).
+			Updates(map[string]interface{}{"status": common.TopUpStatusFailed, "complete_time": common.GetTimestamp()})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return ErrTopUpStatusInvalid
+		}
+		return nil
 	})
 }
 
@@ -359,36 +361,41 @@ func SearchAllTopUps(keyword string, pageInfo *common.PageInfo) (topups []*TopUp
 	return topups, total, nil
 }
 
-// ManualCompleteTopUp 管理员手动完成订单并给用户充值
-func ManualCompleteTopUp(tradeNo string, callerIp string) error {
+func completeManualTopUp(tradeNo string, callerIp string, telegramID int64, verifiedReference string, automatic bool) (bool, error) {
 	if tradeNo == "" {
-		return errors.New("未提供订单号")
-	}
-
-	refCol := "`trade_no`"
-	if common.UsingPostgreSQL {
-		refCol = `"trade_no"`
+		return false, errors.New("未提供订单号")
 	}
 
 	var userId int
 	var quotaToAdd int
 	var payMoney float64
 	var paymentMethod string
+	var approved bool
 
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		topUp := &TopUp{}
-		// 行级锁，避免并发补单
-		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where(refCol+" = ?", tradeNo).First(topUp).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("trade_no = ?", tradeNo).First(topUp).Error; err != nil {
 			return errors.New("充值订单不存在")
 		}
 
-		// 幂等处理：已成功直接返回
 		if topUp.Status == common.TopUpStatusSuccess {
+			if automatic {
+				return ErrTopUpStatusInvalid
+			}
 			return nil
 		}
 
 		if topUp.Status != common.TopUpStatusPending {
 			return errors.New("订单状态不是待支付，无法补单")
+		}
+		if automatic {
+			if !promptPayBankReferencePattern.MatchString(verifiedReference) || topUp.PaymentProvider != PaymentProviderPromptPay {
+				return ErrManualTopUpProviderInvalid
+			}
+			cfg, err := readPromptPayAutoConfig(tx, true)
+			if err != nil || !cfg.Allows(topUp, time.Now()) {
+				return errors.New("auto approval rule is unavailable or no longer matches")
+			}
 		}
 
 		// 计算应充值额度：
@@ -406,18 +413,43 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 			return errors.New("无效的充值额度")
 		}
 
-		// 标记完成
-		topUp.CompleteTime = common.GetTimestamp()
-		topUp.Status = common.TopUpStatusSuccess
-		if err := tx.Save(topUp).Error; err != nil {
+		approvalMethod := "MANUAL"
+		if automatic {
+			approvalMethod = "AUTO"
+		}
+		completedAt := common.GetTimestamp()
+		changes := map[string]interface{}{
+			"status":        common.TopUpStatusSuccess,
+			"complete_time": completedAt,
+		}
+		result := tx.Model(&TopUp{}).Where("id = ? AND status = ?", topUp.Id, common.TopUpStatusPending).Updates(changes)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return ErrTopUpStatusInvalid
+		}
+
+		quotaResult := tx.Model(&User{}).Where("id = ?", topUp.UserId).Update("quota", gorm.Expr("quota + ?", quotaToAdd))
+		if quotaResult.Error != nil {
+			return quotaResult.Error
+		}
+		if quotaResult.RowsAffected != 1 {
+			return errors.New("top-up user no longer exists")
+		}
+		audit := &TopUpApproval{
+			TopUpID: topUp.Id, TradeNo: topUp.TradeNo, UserID: topUp.UserId,
+			PaymentAmount: topUp.Money, Credits: topUp.Amount, ApprovedAt: completedAt,
+			Method: approvalMethod, TelegramAdminID: telegramID,
+		}
+		if automatic {
+			audit.VerifiedReference = &verifiedReference
+		}
+		if err := tx.Create(audit).Error; err != nil {
 			return err
 		}
 
-		// 增加用户额度（立即写库，保持一致性）
-		if err := tx.Model(&User{}).Where("id = ?", topUp.UserId).Update("quota", gorm.Expr("quota + ?", quotaToAdd)).Error; err != nil {
-			return err
-		}
-
+		approved = true
 		userId = topUp.UserId
 		payMoney = topUp.Money
 		paymentMethod = topUp.PaymentMethod
@@ -425,13 +457,35 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 	})
 
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	// 事务外记录日志，避免阻塞
-	RecordTopupLog(userId, fmt.Sprintf("管理员补单成功，充值金额: %v，支付金额：%f", logger.FormatQuota(quotaToAdd), payMoney), callerIp, paymentMethod, "admin")
-	return nil
+	if approved {
+		method := "MANUAL"
+		if automatic {
+			method = "AUTO"
+		}
+		RecordTopupLog(userId,
+			fmt.Sprintf("Top-up approved method=%s trade=%s user=%d amount_thb=%.2f credits=%v telegram_admin_id=%d", method, tradeNo, userId, payMoney, logger.FormatQuota(quotaToAdd), telegramID),
+			callerIp, paymentMethod, method)
+	}
+	return approved, nil
 }
+
+// ManualCompleteTopUp preserves the existing admin API while sharing the atomic approval path.
+func ManualCompleteTopUp(tradeNo string, callerIp string) error {
+	_, err := completeManualTopUp(tradeNo, callerIp, 0, "", false)
+	return err
+}
+
+func ManualCompleteTopUpFromTelegram(tradeNo string, callerIp string, telegramID int64) (bool, error) {
+	return completeManualTopUp(tradeNo, callerIp, telegramID, "", false)
+}
+
+func AutoCompletePromptPayTopUp(tradeNo string, callerIp string, verifiedReference string) (bool, error) {
+	return completeManualTopUp(tradeNo, callerIp, 0, verifiedReference, true)
+}
+
 func RechargeCreem(referenceId string, customerEmail string, customerName string, callerIp string) (err error) {
 	if referenceId == "" {
 		return errors.New("未提供支付单号")

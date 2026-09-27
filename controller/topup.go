@@ -613,11 +613,11 @@ func formatIntWithCommas(value int64) string {
 	return string(out)
 }
 
-func confirmOtherPaymentTrade(tradeNo string, callerIp string) error {
+func confirmOtherPaymentTrade(tradeNo string, callerIp string, telegramID int64) (bool, error) {
 	LockOrder(tradeNo)
 	defer UnlockOrder(tradeNo)
 
-	return model.ManualCompleteTopUp(tradeNo, callerIp)
+	return model.ManualCompleteTopUpFromTelegram(tradeNo, callerIp, telegramID)
 }
 
 type telegramTopupAction string
@@ -672,9 +672,11 @@ func tradeNoFromTelegramCaption(caption string) string {
 
 func sendTelegramCommandMessage(botToken string, chatID int64, replyToMessageID int, text string) {
 	form := url.Values{
-		"chat_id":             {strconv.FormatInt(chatID, 10)},
-		"reply_to_message_id": {strconv.Itoa(replyToMessageID)},
-		"text":                {text},
+		"chat_id": {strconv.FormatInt(chatID, 10)},
+		"text":    {text},
+	}
+	if replyToMessageID > 0 {
+		form.Set("reply_to_message_id", strconv.Itoa(replyToMessageID))
 	}
 	endpoint := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
 	req, err := http.NewRequest(http.MethodPost, endpoint, strings.NewReader(form.Encode()))
@@ -773,7 +775,11 @@ func RequestPromptPayTopUp(c *gin.Context) {
 	}
 
 	message := buildPromptPayNotification(tradeNo, userID, amount, creditAmount, bankFrom)
-	go notifyTelegramPromptPay(paymentSetting, tradeNo, message, slip.Filename, slipBytes)
+	callerIP := c.ClientIP()
+	go func() {
+		notifyTelegramPromptPay(paymentSetting, tradeNo, message, slip.Filename, slipBytes)
+		tryAutoApprovePromptPay(topUp, slip.Filename, slipBytes, callerIP)
+	}()
 
 	common.ApiSuccess(c, gin.H{
 		"trade_no": tradeNo,
@@ -871,6 +877,15 @@ func OtherPaymentTelegramWebhook(c *gin.Context) {
 		c.Status(http.StatusUnauthorized)
 		return
 	}
+	if _, recognized := parseAutoCommand(update.Message.Text); recognized {
+		response := "คำสั่ง Auto Approve ใช้ได้เฉพาะกลุ่ม PromptPay ที่ตั้งค่าไว้"
+		if isPromptPayAutoBot(update.Message.Chat.ID, botToken) {
+			response, _ = processAutoCommand(update.Message.Text, update.Message.From.ID)
+		}
+		go sendTelegramCommandMessage(botToken, update.Message.Chat.ID, update.Message.MessageID, response)
+		common.ApiSuccess(c, nil)
+		return
+	}
 
 	action, tradeNo, recognized := parseTelegramTopupCommand(update.Message.Text)
 	if !recognized {
@@ -921,9 +936,10 @@ func OtherPaymentTelegramWebhook(c *gin.Context) {
 		return
 	}
 
+	approved := false
 	switch action {
 	case telegramTopupApprove:
-		err = confirmOtherPaymentTrade(tradeNo, c.ClientIP())
+		approved, err = confirmOtherPaymentTrade(tradeNo, c.ClientIP(), update.Message.From.ID)
 	case telegramTopupReject:
 		LockOrder(tradeNo)
 		err = model.RejectManualTopUp(tradeNo)
@@ -947,6 +963,9 @@ func OtherPaymentTelegramWebhook(c *gin.Context) {
 	resultText := fmt.Sprintf("ปฏิเสธรายการ %s แล้ว ไม่มีการเติมเครดิต", tradeNo)
 	if action == telegramTopupApprove {
 		resultText = fmt.Sprintf("อนุมัติรายการ %s สำเร็จ และเติมเครดิตให้ผู้ใช้แล้ว", tradeNo)
+		if !approved {
+			resultText = fmt.Sprintf("รายการ %s ได้รับการอนุมัติไปแล้ว ไม่มีการเติมเครดิตซ้ำ", tradeNo)
+		}
 	}
 	go sendTelegramCommandMessage(
 		botToken,
@@ -981,7 +1000,7 @@ func OtherPaymentLineWebhook(c *gin.Context) {
 			continue
 		}
 		if tradeNo := parseOtherPaymentConfirmText(event.Message.Text); tradeNo != "" {
-			if err := confirmOtherPaymentTrade(tradeNo, c.ClientIP()); err != nil {
+			if _, err := confirmOtherPaymentTrade(tradeNo, c.ClientIP(), 0); err != nil {
 				common.ApiError(c, err)
 				return
 			}
