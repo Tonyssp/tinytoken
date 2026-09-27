@@ -3,6 +3,7 @@ package controller
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,18 +27,23 @@ var slipOKBranchPattern = regexp.MustCompile(`^/api/line/apikey/[A-Za-z0-9_-]+/?
 var slipOKReferencePattern = regexp.MustCompile(`^[A-Za-z0-9_-]{8,128}$`)
 
 func slipOKConfigured(setting *operation_setting.PaymentSetting) bool {
-	if setting == nil || !setting.PromptPayEnabled || !setting.PromptPayTelegramEnabled ||
-		strings.TrimSpace(setting.PromptPayTelegramBotSecret) == "" ||
-		strings.TrimSpace(setting.PromptPayTelegramChatId) == "" ||
-		!strings.EqualFold(setting.PromptPaySlipProvider, "slipok") ||
+	if !promptPayWhitelistConfigured(setting) || !strings.EqualFold(setting.PromptPaySlipProvider, "slipok") ||
 		strings.TrimSpace(setting.PromptPaySlipApiKey) == "" {
 		return false
 	}
 	endpoint, err := url.Parse(strings.TrimSpace(setting.PromptPaySlipApiURL))
-	_, chatErr := strconv.ParseInt(strings.TrimSpace(setting.PromptPayTelegramChatId), 10, 64)
-	return err == nil && chatErr == nil && endpoint.Scheme == "https" && endpoint.Host == "api.slipok.com" &&
+	return err == nil && endpoint.Scheme == "https" && endpoint.Host == "api.slipok.com" &&
 		endpoint.User == nil && endpoint.RawQuery == "" && endpoint.Fragment == "" &&
 		slipOKBranchPattern.MatchString(endpoint.Path)
+}
+
+func promptPayWhitelistConfigured(setting *operation_setting.PaymentSetting) bool {
+	if setting == nil || !setting.PromptPayEnabled || !setting.PromptPayTelegramEnabled ||
+		strings.TrimSpace(setting.PromptPayTelegramBotSecret) == "" {
+		return false
+	}
+	chatID, err := strconv.ParseInt(strings.TrimSpace(setting.PromptPayTelegramChatId), 10, 64)
+	return err == nil && chatID < 0
 }
 
 type slipOKCheckResponse struct {
@@ -147,6 +153,25 @@ func tryAutoApprovePromptPay(topUp *model.TopUp, filename string, slip []byte, c
 		return
 	}
 	setting := operation_setting.GetPaymentSetting()
+	if cfg.EffectiveMode() == model.PromptPayAutoModeWhitelist {
+		if !promptPayWhitelistConfigured(setting) || len(slip) == 0 {
+			return
+		}
+		digest := sha256.Sum256(slip)
+		approved, err := model.AutoCompletePromptPayWhitelistTopUp(topUp.TradeNo, callerIP, fmt.Sprintf("%x", digest))
+		if err != nil || !approved {
+			if err != nil {
+				common.SysLog("PromptPay whitelist approval left pending trade=" + topUp.TradeNo + " because the database, rule, or slip reuse check failed")
+			}
+			return
+		}
+		chatID, err := strconv.ParseInt(strings.TrimSpace(setting.PromptPayTelegramChatId), 10, 64)
+		if err == nil {
+			sendTelegramCommandMessage(setting.PromptPayTelegramBotSecret, chatID, 0,
+				fmt.Sprintf("Whitelist Auto Approved (payment NOT verified)\nTransaction: %s\nUser ID: %d\nAmount claimed: %.0f THB\nCredit: %d", topUp.TradeNo, topUp.UserId, topUp.Money, topUp.Amount))
+		}
+		return
+	}
 	if !slipOKConfigured(setting) {
 		return
 	}

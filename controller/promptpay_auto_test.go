@@ -75,6 +75,47 @@ func TestAuthorizedAutoCommandsPersistAndDisable(t *testing.T) {
 	assert.False(t, cfg.Enabled)
 }
 
+func TestWhitelistModeCanEnableWithoutSlipOKAndSwitchingDisables(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&model.Option{}))
+	previousDB := model.DB
+	model.DB = db
+	t.Cleanup(func() { model.DB = previousDB })
+	setting := operation_setting.GetPaymentSetting()
+	previousSetting := *setting
+	t.Cleanup(func() { *setting = previousSetting })
+	setting.PromptPayEnabled = true
+	setting.PromptPayTelegramEnabled = true
+	setting.PromptPayTelegramBotSecret = "test-token"
+	setting.PromptPayTelegramChatId = "-1001"
+	setting.PromptPaySlipProvider = "manual"
+	setting.PromptPaySlipApiURL = ""
+	setting.PromptPaySlipApiKey = ""
+	for _, command := range []string{
+		"/auto_timezone Asia/Bangkok", "/auto_time 02:00 08:00", "/auto_user add 41", "/auto_max 60",
+		"/auto_mode whitelist", "/auto on",
+	} {
+		response, handled := processAutoCommand(command, 123, true)
+		require.True(t, handled)
+		require.NotContains(t, response, "ไม่สำเร็จ", command)
+	}
+	response, _ := processAutoCommand("/auto_status", 123, true)
+	assert.Contains(t, response, "Auto Approve: ON")
+	assert.Contains(t, response, "Mode: whitelist")
+	assert.Contains(t, response, "NOT USED")
+	response, _ = processAutoCommand("/auto_mode verified", 123, true)
+	assert.Contains(t, response, "Auto Approve: OFF")
+	response, _ = processAutoCommand("/auto on", 123, true)
+	assert.Contains(t, response, "SlipOK")
+	response, _ = processAutoCommand("/auto_mode whitelist", 999, false)
+	assert.Contains(t, response, "แอดมินของกลุ่ม")
+	cfg, err := model.GetPromptPayAutoConfig()
+	require.NoError(t, err)
+	assert.Equal(t, model.PromptPayAutoModeVerified, cfg.EffectiveMode())
+	assert.False(t, cfg.Enabled)
+}
+
 func TestSlipOKConfigurationIsStrict(t *testing.T) {
 	setting := &operation_setting.PaymentSetting{
 		PromptPayEnabled: true, PromptPayTelegramEnabled: true,

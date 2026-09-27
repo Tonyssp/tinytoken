@@ -25,6 +25,7 @@ type telegramBotCommand struct {
 var promptPayAdminCommands = []telegramBotCommand{
 	{Command: "auto", Description: "เปิดหรือปิด Auto Approve: on/off"},
 	{Command: "auto_status", Description: "ดูสถานะและกฎ Auto Approve"},
+	{Command: "auto_mode", Description: "เลือก verified หรือ whitelist"},
 	{Command: "auto_time", Description: "ตั้งช่วงเวลา HH:MM HH:MM"},
 	{Command: "auto_timezone", Description: "ตั้งเขตเวลา เช่น Asia/Bangkok"},
 	{Command: "auto_user", Description: "จัดการผู้ใช้: add/remove/list"},

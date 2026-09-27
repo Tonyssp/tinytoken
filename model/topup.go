@@ -361,10 +361,11 @@ func SearchAllTopUps(keyword string, pageInfo *common.PageInfo) (topups []*TopUp
 	return topups, total, nil
 }
 
-func completeManualTopUp(tradeNo string, callerIp string, telegramID int64, verifiedReference string, automatic bool) (bool, error) {
+func completeManualTopUp(tradeNo string, callerIp string, telegramID int64, approvalReference string, autoMode string) (bool, error) {
 	if tradeNo == "" {
 		return false, errors.New("未提供订单号")
 	}
+	automatic := autoMode != ""
 
 	var userId int
 	var quotaToAdd int
@@ -389,11 +390,14 @@ func completeManualTopUp(tradeNo string, callerIp string, telegramID int64, veri
 			return errors.New("订单状态不是待支付，无法补单")
 		}
 		if automatic {
-			if !promptPayBankReferencePattern.MatchString(verifiedReference) || topUp.PaymentProvider != PaymentProviderPromptPay {
+			if topUp.PaymentProvider != PaymentProviderPromptPay ||
+				(autoMode == PromptPayAutoModeVerified && !promptPayBankReferencePattern.MatchString(approvalReference)) ||
+				(autoMode == PromptPayAutoModeWhitelist && !promptPayWhitelistReferencePattern.MatchString(approvalReference)) ||
+				(autoMode != PromptPayAutoModeVerified && autoMode != PromptPayAutoModeWhitelist) {
 				return ErrManualTopUpProviderInvalid
 			}
 			cfg, err := readPromptPayAutoConfig(tx, true)
-			if err != nil || !cfg.Allows(topUp, time.Now()) {
+			if err != nil || cfg.EffectiveMode() != autoMode || !cfg.Allows(topUp, time.Now()) {
 				return errors.New("auto approval rule is unavailable or no longer matches")
 			}
 		}
@@ -414,8 +418,10 @@ func completeManualTopUp(tradeNo string, callerIp string, telegramID int64, veri
 		}
 
 		approvalMethod := "MANUAL"
-		if automatic {
+		if autoMode == PromptPayAutoModeVerified {
 			approvalMethod = "AUTO"
+		} else if autoMode == PromptPayAutoModeWhitelist {
+			approvalMethod = "AUTO_WHITELIST"
 		}
 		completedAt := common.GetTimestamp()
 		changes := map[string]interface{}{
@@ -443,7 +449,7 @@ func completeManualTopUp(tradeNo string, callerIp string, telegramID int64, veri
 			Method: approvalMethod, TelegramAdminID: telegramID,
 		}
 		if automatic {
-			audit.VerifiedReference = &verifiedReference
+			audit.VerifiedReference = &approvalReference
 		}
 		if err := tx.Create(audit).Error; err != nil {
 			return err
@@ -462,8 +468,10 @@ func completeManualTopUp(tradeNo string, callerIp string, telegramID int64, veri
 
 	if approved {
 		method := "MANUAL"
-		if automatic {
+		if autoMode == PromptPayAutoModeVerified {
 			method = "AUTO"
+		} else if autoMode == PromptPayAutoModeWhitelist {
+			method = "AUTO_WHITELIST"
 		}
 		RecordTopupLog(userId,
 			fmt.Sprintf("Top-up approved method=%s trade=%s user=%d amount_thb=%.2f credits=%v telegram_admin_id=%d", method, tradeNo, userId, payMoney, logger.FormatQuota(quotaToAdd), telegramID),
@@ -474,16 +482,20 @@ func completeManualTopUp(tradeNo string, callerIp string, telegramID int64, veri
 
 // ManualCompleteTopUp preserves the existing admin API while sharing the atomic approval path.
 func ManualCompleteTopUp(tradeNo string, callerIp string) error {
-	_, err := completeManualTopUp(tradeNo, callerIp, 0, "", false)
+	_, err := completeManualTopUp(tradeNo, callerIp, 0, "", "")
 	return err
 }
 
 func ManualCompleteTopUpFromTelegram(tradeNo string, callerIp string, telegramID int64) (bool, error) {
-	return completeManualTopUp(tradeNo, callerIp, telegramID, "", false)
+	return completeManualTopUp(tradeNo, callerIp, telegramID, "", "")
 }
 
 func AutoCompletePromptPayTopUp(tradeNo string, callerIp string, verifiedReference string) (bool, error) {
-	return completeManualTopUp(tradeNo, callerIp, 0, verifiedReference, true)
+	return completeManualTopUp(tradeNo, callerIp, 0, verifiedReference, PromptPayAutoModeVerified)
+}
+
+func AutoCompletePromptPayWhitelistTopUp(tradeNo string, callerIp string, slipDigest string) (bool, error) {
+	return completeManualTopUp(tradeNo, callerIp, 0, "wl_"+slipDigest, PromptPayAutoModeWhitelist)
 }
 
 func RechargeCreem(referenceId string, customerEmail string, customerName string, callerIp string) (err error) {

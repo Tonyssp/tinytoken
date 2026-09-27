@@ -18,7 +18,7 @@ func parseAutoCommand(text string) ([]string, bool) {
 	}
 	name := strings.ToLower(strings.SplitN(fields[0], "@", 2)[0])
 	switch name {
-	case "/auto", "/auto_time", "/auto_user", "/auto_max", "/auto_status", "/auto_timezone", "/auto_id":
+	case "/auto", "/auto_mode", "/auto_time", "/auto_user", "/auto_max", "/auto_status", "/auto_timezone", "/auto_id":
 		fields[0] = name
 		return fields, true
 	default:
@@ -42,7 +42,11 @@ func promptPayAutoStatus() string {
 	if cfg.Enabled {
 		state = "ON"
 	}
+	mode := cfg.EffectiveMode()
 	providerReady := slipOKConfigured(operation_setting.GetPaymentSetting())
+	if mode == model.PromptPayAutoModeWhitelist {
+		providerReady = promptPayWhitelistConfigured(operation_setting.GetPaymentSetting())
+	}
 	if cfg.Enabled {
 		if err := model.RequirePromptPayAutoReady(cfg); err != nil || !providerReady {
 			state = "ON (paused: rule or verification unavailable)"
@@ -69,10 +73,12 @@ func promptPayAutoStatus() string {
 		timezone = "not set"
 	}
 	provider := "not configured"
-	if providerReady {
+	if mode == model.PromptPayAutoModeWhitelist {
+		provider = "NOT USED - uploaded slips are not verified"
+	} else if providerReady {
 		provider = "SlipOK configured"
 	}
-	return fmt.Sprintf("Auto Approve: %s\nTime: %s - %s\nTimezone: %s\nAllowed Users: %s\nMaximum Amount: %d THB\nPayment verification: %s", state, start, end, timezone, users, cfg.MaxAmountTHB, provider)
+	return fmt.Sprintf("Auto Approve: %s\nMode: %s\nTime: %s - %s\nTimezone: %s\nAllowed Users: %s\nMaximum Amount: %d THB\nPayment verification: %s", state, mode, start, end, timezone, users, cfg.MaxAmountTHB, provider)
 }
 
 func processAutoCommand(text string, telegramID int64, isAdmin bool) (string, bool) {
@@ -105,10 +111,23 @@ func processAutoCommand(text string, telegramID int64, isAdmin bool) (string, bo
 		return promptPayAutoStatus(), true
 	}
 	if fields[0] == "/auto" && len(fields) == 2 && strings.EqualFold(fields[1], "on") {
-		if !slipOKConfigured(operation_setting.GetPaymentSetting()) {
+		cfg, err := model.GetPromptPayAutoConfig()
+		if err != nil {
+			return "เปิด Auto Approve ไม่สำเร็จ: อ่านการตั้งค่าไม่ได้", true
+		}
+		if cfg.EffectiveMode() == model.PromptPayAutoModeVerified && !slipOKConfigured(operation_setting.GetPaymentSetting()) {
 			return "ยังเปิด Auto Approve ไม่ได้: ต้องตั้งค่า SlipOK API พร้อมผูกบัญชีผู้รับเพื่อตรวจสลิปจริงก่อน", true
 		}
-		_, err := model.UpdatePromptPayAutoConfig(func(cfg *model.PromptPayAutoConfig) error {
+		if cfg.EffectiveMode() == model.PromptPayAutoModeWhitelist && !promptPayWhitelistConfigured(operation_setting.GetPaymentSetting()) {
+			return "ยังเปิด Auto Approve ไม่ได้: ต้องเปิด PromptPay และตั้งค่าบอต Telegram กับกลุ่มแอดมินก่อน", true
+		}
+		_, err = model.UpdatePromptPayAutoConfig(func(cfg *model.PromptPayAutoConfig) error {
+			if cfg.EffectiveMode() == model.PromptPayAutoModeVerified && !slipOKConfigured(operation_setting.GetPaymentSetting()) {
+				return fmt.Errorf("SlipOK is not configured")
+			}
+			if cfg.EffectiveMode() == model.PromptPayAutoModeWhitelist && !promptPayWhitelistConfigured(operation_setting.GetPaymentSetting()) {
+				return fmt.Errorf("Telegram admin group is not configured")
+			}
 			if err := model.RequirePromptPayAutoReady(*cfg); err != nil {
 				return err
 			}
@@ -122,6 +141,16 @@ func processAutoCommand(text string, telegramID int64, isAdmin bool) (string, bo
 	}
 	var change func(*model.PromptPayAutoConfig) error
 	switch fields[0] {
+	case "/auto_mode":
+		if len(fields) != 2 || (fields[1] != model.PromptPayAutoModeVerified && fields[1] != model.PromptPayAutoModeWhitelist) {
+			return "ใช้ /auto_mode verified หรือ /auto_mode whitelist", true
+		}
+		mode := fields[1]
+		change = func(cfg *model.PromptPayAutoConfig) error {
+			cfg.Mode = mode
+			cfg.Enabled = false
+			return nil
+		}
 	case "/auto_time":
 		if len(fields) != 3 {
 			return "ใช้ /auto_time HH:MM HH:MM", true
@@ -190,7 +219,7 @@ func processAutoCommand(text string, telegramID int64, isAdmin bool) (string, bo
 			return "ใช้ /auto_user add USER_ID หรือ /auto_user remove USER_ID", true
 		}
 	default:
-		return "คำสั่งไม่ถูกต้อง: /auto on|off, /auto_time, /auto_timezone, /auto_user, /auto_max, /auto_status", true
+		return "คำสั่งไม่ถูกต้อง: /auto on|off, /auto_mode, /auto_time, /auto_timezone, /auto_user, /auto_max, /auto_status", true
 	}
 	if _, err := model.UpdatePromptPayAutoConfig(change); err != nil {
 		return "บันทึกการตั้งค่าไม่สำเร็จ: " + err.Error(), true

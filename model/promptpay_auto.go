@@ -16,11 +16,18 @@ import (
 
 const promptPayAutoOptionKey = "PromptPayAutoApprove"
 
+const (
+	PromptPayAutoModeVerified  = "verified"
+	PromptPayAutoModeWhitelist = "whitelist"
+)
+
 var promptPayTradePattern = regexp.MustCompile(`^THA[1-9][0-9]*NO[A-Za-z0-9]{6}[0-9]{10,}$`)
 var promptPayBankReferencePattern = regexp.MustCompile(`^[A-Za-z0-9_-]{8,128}$`)
+var promptPayWhitelistReferencePattern = regexp.MustCompile(`^wl_[a-f0-9]{64}$`)
 
 type PromptPayAutoConfig struct {
 	Enabled        bool   `json:"enabled"`
+	Mode           string `json:"mode"`
 	Start          string `json:"start"`
 	End            string `json:"end"`
 	Timezone       string `json:"timezone"`
@@ -28,7 +35,17 @@ type PromptPayAutoConfig struct {
 	MaxAmountTHB   int64  `json:"max_amount_thb"`
 }
 
+func (cfg PromptPayAutoConfig) EffectiveMode() string {
+	if cfg.Mode == "" {
+		return PromptPayAutoModeVerified
+	}
+	return cfg.Mode
+}
+
 func (cfg PromptPayAutoConfig) validateReady() (*time.Location, int, int, error) {
+	if mode := cfg.EffectiveMode(); mode != PromptPayAutoModeVerified && mode != PromptPayAutoModeWhitelist {
+		return nil, 0, 0, errors.New("invalid auto approval mode")
+	}
 	if cfg.MaxAmountTHB <= 0 || len(cfg.AllowedUserIDs) == 0 {
 		return nil, 0, 0, errors.New("set a positive maximum and at least one user")
 	}

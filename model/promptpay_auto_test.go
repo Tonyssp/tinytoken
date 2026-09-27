@@ -1,6 +1,7 @@
 package model
 
 import (
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -167,4 +168,51 @@ func TestAutoConfigInvalidFailsClosed(t *testing.T) {
 	cfg, err := GetPromptPayAutoConfig()
 	require.NoError(t, err)
 	assert.False(t, cfg.Enabled)
+}
+
+func TestWhitelistAutoApprovalIsExplicitAndPreventsExactSlipReuse(t *testing.T) {
+	truncateTables(t)
+	cfg := readyAutoConfig(time.Now())
+	cfg.Mode = PromptPayAutoModeWhitelist
+	_, err := UpdatePromptPayAutoConfig(func(saved *PromptPayAutoConfig) error { *saved = cfg; return nil })
+	require.NoError(t, err)
+	insertUserForPaymentGuardTest(t, 701, 100)
+	require.NoError(t, DB.Create(&User{Id: 702, Username: "payment_guard_user_702", AffCode: "guard702", Status: common.UserStatusEnabled, Quota: 100}).Error)
+	trades := []struct {
+		trade string
+		user  int
+		money float64
+	}{
+		{"THA701NOABC1231790455631", 701, 30},
+		{"THA701NOABC1231790455632", 701, 30},
+		{"THA702NOABC1231790455633", 702, 30},
+		{"THA701NOABC1231790455634", 701, 101},
+	}
+	for _, item := range trades {
+		require.NoError(t, (&TopUp{UserId: item.user, Amount: int64(item.money), Money: item.money,
+			TradeNo: item.trade, PaymentMethod: PaymentMethodPromptPay, PaymentProvider: PaymentProviderPromptPay,
+			Status: common.TopUpStatusPending, CreateTime: time.Now().Unix()}).Insert())
+	}
+	digest := strings.Repeat("a", 64)
+	approved, err := AutoCompletePromptPayWhitelistTopUp(trades[0].trade, "", digest)
+	require.NoError(t, err)
+	assert.True(t, approved)
+	var audit TopUpApproval
+	require.NoError(t, DB.Where("trade_no = ?", trades[0].trade).First(&audit).Error)
+	assert.Equal(t, "AUTO_WHITELIST", audit.Method)
+	require.NotNil(t, audit.VerifiedReference)
+	assert.Equal(t, "wl_"+digest, *audit.VerifiedReference)
+
+	for _, item := range trades[1:] {
+		approved, err = AutoCompletePromptPayWhitelistTopUp(item.trade, "", digest)
+		assert.False(t, approved)
+		assert.Error(t, err)
+		assert.Equal(t, common.TopUpStatusPending, GetTopUpByTradeNo(item.trade).Status)
+	}
+	approved, err = AutoCompletePromptPayTopUp(trades[1].trade, "", "bank-ref-123456")
+	assert.False(t, approved)
+	assert.Error(t, err)
+	wantAdded := int(decimal.NewFromInt(30).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart())
+	assert.Equal(t, 100+wantAdded, getUserQuotaForPaymentGuardTest(t, 701))
+	assert.Equal(t, 100, getUserQuotaForPaymentGuardTest(t, 702))
 }
