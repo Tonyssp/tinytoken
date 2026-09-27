@@ -10,7 +10,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -143,9 +142,6 @@ func verifySlipOK(ctx context.Context, client *http.Client, endpoint, apiKey, fi
 }
 
 func tryAutoApprovePromptPay(topUp *model.TopUp, filename string, slip []byte, callerIP string) {
-	if _, ok := telegramAutoAdminIDs(os.Getenv("TELEGRAM_ADMIN_IDS")); !ok {
-		return
-	}
 	cfg, err := model.GetPromptPayAutoConfig()
 	if err != nil || !cfg.Allows(topUp, time.Now()) {
 		return

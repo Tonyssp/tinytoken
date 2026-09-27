@@ -877,10 +877,22 @@ func OtherPaymentTelegramWebhook(c *gin.Context) {
 		c.Status(http.StatusUnauthorized)
 		return
 	}
-	if _, recognized := parseAutoCommand(update.Message.Text); recognized {
+	if fields, recognized := parseAutoCommand(update.Message.Text); recognized {
 		response := "คำสั่ง Auto Approve ใช้ได้เฉพาะกลุ่ม PromptPay ที่ตั้งค่าไว้"
 		if isPromptPayAutoBot(update.Message.Chat.ID, botToken) {
-			response, _ = processAutoCommand(update.Message.Text, update.Message.From.ID)
+			if fields[0] == "/auto_id" {
+				response, _ = processAutoCommand(update.Message.Text, update.Message.From.ID, false)
+			} else {
+				isAdmin, err := isTelegramGroupAdmin(botToken, update.Message.Chat.ID, update.Message.From.ID)
+				switch {
+				case err != nil:
+					response = "ตรวจสอบสิทธิ์แอดมินไม่สำเร็จ กรุณาลองอีกครั้ง"
+				case !isAdmin:
+					response = "คำสั่ง Auto Approve ใช้ได้เฉพาะแอดมินของกลุ่ม"
+				default:
+					response, _ = processAutoCommand(update.Message.Text, update.Message.From.ID, true)
+				}
+			}
 		}
 		go sendTelegramCommandMessage(botToken, update.Message.Chat.ID, update.Message.MessageID, response)
 		common.ApiSuccess(c, nil)

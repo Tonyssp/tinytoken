@@ -6,19 +6,16 @@ and admin top-up completion remain available.
 
 ## Prerequisites
 
-1. Set `TELEGRAM_ADMIN_IDS` in the VPS Compose `.env` file to a comma-separated
-   list of numeric Telegram user IDs, for example `123456789,987654321`, then
-   recreate only the app container. Group membership alone cannot change
-   auto-approval settings. Missing or malformed IDs fail closed, including if
-   the variable is removed after auto approval was enabled. An admin can send
-   `/auto_id` in the PromptPay group to see their own Telegram user ID; this is
-   different from the TinyToken user ID shown in top-up notifications.
-2. Enable the existing PromptPay Telegram bot and its admin group.
-3. Configure a SlipOK API branch with the actual receiving bank account bound
+1. Enable the existing PromptPay Telegram bot and its admin group. The bot
+   checks Telegram's current group administrator status for every settings
+   command, just as it does for manual approval replies `1` and `2`. If that
+   check fails, no settings are changed. `/auto_id` shows the sender's Telegram
+   ID for troubleshooting; it is different from a TinyToken user ID.
+2. Configure a SlipOK API branch with the actual receiving bank account bound
    in SlipOK. Select `slipok` as the PromptPay slip provider in payment settings,
    set its API URL to `https://api.slipok.com/api/line/apikey/BRANCH_ID`, and set
    the API key there. Do not put the API key in Telegram or this document.
-4. In the configured PromptPay Telegram group, an authorized ID runs:
+3. In the configured PromptPay Telegram group, an administrator runs:
 
    ```text
    /auto_timezone Asia/Bangkok

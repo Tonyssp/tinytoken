@@ -17,20 +17,13 @@ import (
 )
 
 func TestAutoCommandAuthorization(t *testing.T) {
-	response, handled := processAutoCommand("/auto_id", 789)
+	response, handled := processAutoCommand("/auto_id", 789, false)
 	assert.True(t, handled)
 	assert.Contains(t, response, "789")
-	t.Setenv("TELEGRAM_ADMIN_IDS", "123,456")
-	assert.True(t, authorizedTelegramAutoAdmin(123, "123,456"))
-	assert.False(t, authorizedTelegramAutoAdmin(789, "123,456"))
-	assert.False(t, authorizedTelegramAutoAdmin(123, "123,bad"))
-	t.Setenv("TELEGRAM_ADMIN_IDS", "123,bad")
-	tryAutoApprovePromptPay(nil, "", nil, "")
-	t.Setenv("TELEGRAM_ADMIN_IDS", "123,456")
 	for _, command := range []string{"/auto on", "/auto_user add 789"} {
-		response, handled := processAutoCommand(command, 789)
+		response, handled := processAutoCommand(command, 789, false)
 		assert.True(t, handled)
-		assert.Contains(t, response, "ไม่มีสิทธิ์")
+		assert.Contains(t, response, "แอดมินของกลุ่ม")
 	}
 	fields, recognized := parseAutoCommand("/auto@tiny_bot off")
 	assert.True(t, recognized)
@@ -54,11 +47,10 @@ func TestAuthorizedAutoCommandsPersistAndDisable(t *testing.T) {
 	setting.PromptPaySlipProvider = "slipok"
 	setting.PromptPaySlipApiURL = "https://api.slipok.com/api/line/apikey/branch123"
 	setting.PromptPaySlipApiKey = "test-key"
-	t.Setenv("TELEGRAM_ADMIN_IDS", "123")
 	for _, command := range []string{
 		"/auto_timezone Asia/Bangkok", "/auto_time 23:00 08:00", "/auto_user add 41", "/auto_max 100", "/auto on",
 	} {
-		response, handled := processAutoCommand(command, 123)
+		response, handled := processAutoCommand(command, 123, true)
 		require.True(t, handled)
 		require.NotContains(t, response, "ไม่สำเร็จ", command)
 	}
@@ -66,16 +58,16 @@ func TestAuthorizedAutoCommandsPersistAndDisable(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, cfg.Enabled)
 	assert.Equal(t, []int{41}, cfg.AllowedUserIDs)
-	response, handled := processAutoCommand("/auto_user add 123", 999)
+	response, handled := processAutoCommand("/auto_user add 123", 999, false)
 	assert.True(t, handled)
-	assert.Contains(t, response, "ไม่มีสิทธิ์")
-	response, handled = processAutoCommand("/auto off", 999)
+	assert.Contains(t, response, "แอดมินของกลุ่ม")
+	response, handled = processAutoCommand("/auto off", 999, false)
 	assert.True(t, handled)
-	assert.Contains(t, response, "ไม่มีสิทธิ์")
+	assert.Contains(t, response, "แอดมินของกลุ่ม")
 	cfg, err = model.GetPromptPayAutoConfig()
 	require.NoError(t, err)
 	assert.True(t, cfg.Enabled)
-	response, handled = processAutoCommand("/auto off", 123)
+	response, handled = processAutoCommand("/auto off", 123, true)
 	assert.True(t, handled)
 	assert.Contains(t, response, "OFF")
 	cfg, err = model.GetPromptPayAutoConfig()

@@ -21,7 +21,6 @@ services:
       ERROR_LOG_ENABLED: "true"
       BATCH_UPDATE_ENABLED: "true"
       NODE_NAME: "${NODE_NAME:-tinyapi-vps-1}"
-      TELEGRAM_ADMIN_IDS: "${TELEGRAM_ADMIN_IDS:-}"
       CHANNEL_UPSTREAM_MODEL_UPDATE_TASK_ENABLED: "${CHANNEL_UPSTREAM_MODEL_UPDATE_TASK_ENABLED:-false}"
     depends_on:
       postgres:

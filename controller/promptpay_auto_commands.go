@@ -2,7 +2,6 @@ package controller
 
 import (
 	"fmt"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -11,26 +10,6 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 )
-
-func telegramAutoAdminIDs(configured string) (map[int64]bool, bool) {
-	if strings.TrimSpace(configured) == "" {
-		return nil, false
-	}
-	ids := make(map[int64]bool)
-	for _, item := range strings.Split(configured, ",") {
-		id, err := strconv.ParseInt(strings.TrimSpace(item), 10, 64)
-		if err != nil || id <= 0 {
-			return nil, false
-		}
-		ids[id] = true
-	}
-	return ids, len(ids) > 0
-}
-
-func authorizedTelegramAutoAdmin(userID int64, configured string) bool {
-	ids, ok := telegramAutoAdminIDs(configured)
-	return ok && ids[userID]
-}
 
 func parseAutoCommand(text string) ([]string, bool) {
 	fields := strings.Fields(strings.TrimSpace(text))
@@ -63,12 +42,10 @@ func promptPayAutoStatus() string {
 	if cfg.Enabled {
 		state = "ON"
 	}
-	adminIDsReady := false
-	_, adminIDsReady = telegramAutoAdminIDs(os.Getenv("TELEGRAM_ADMIN_IDS"))
 	providerReady := slipOKConfigured(operation_setting.GetPaymentSetting())
 	if cfg.Enabled {
-		if err := model.RequirePromptPayAutoReady(cfg); err != nil || !adminIDsReady || !providerReady {
-			state = "ON (paused: rule, authorization, or verification unavailable)"
+		if err := model.RequirePromptPayAutoReady(cfg); err != nil || !providerReady {
+			state = "ON (paused: rule or verification unavailable)"
 		}
 	}
 	users := "none"
@@ -98,7 +75,7 @@ func promptPayAutoStatus() string {
 	return fmt.Sprintf("Auto Approve: %s\nTime: %s - %s\nTimezone: %s\nAllowed Users: %s\nMaximum Amount: %d THB\nPayment verification: %s", state, start, end, timezone, users, cfg.MaxAmountTHB, provider)
 }
 
-func processAutoCommand(text string, telegramID int64) (string, bool) {
+func processAutoCommand(text string, telegramID int64, isAdmin bool) (string, bool) {
 	fields, recognized := parseAutoCommand(text)
 	if !recognized {
 		return "", false
@@ -109,8 +86,8 @@ func processAutoCommand(text string, telegramID int64) (string, bool) {
 		}
 		return fmt.Sprintf("Telegram ID ของคุณ: %d", telegramID), true
 	}
-	if !authorizedTelegramAutoAdmin(telegramID, os.Getenv("TELEGRAM_ADMIN_IDS")) {
-		return "ไม่อนุญาต: Telegram ID นี้ไม่มีสิทธิ์ตั้งค่า Auto Approve", true
+	if !isAdmin {
+		return "ไม่อนุญาต: เฉพาะแอดมินของกลุ่ม PromptPay เท่านั้นที่ตั้งค่า Auto Approve ได้", true
 	}
 	if fields[0] == "/auto_status" {
 		if len(fields) != 1 {
