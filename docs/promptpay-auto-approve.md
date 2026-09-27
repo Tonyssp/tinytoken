@@ -10,7 +10,9 @@ and admin top-up completion remain available.
    checks Telegram's current group administrator status for every settings
    command, just as it does for manual approval replies `1` and `2`. If that
    check fails, no settings are changed. `/auto_id` shows the sender's Telegram
-   ID for troubleshooting; it is different from a TinyToken user ID.
+   ID for troubleshooting; it is different from a TinyToken user ID. The bot
+   registers these slash commands for that group's administrators at app startup
+   and after its Telegram settings change.
 2. Configure a SlipOK API branch with the actual receiving bank account bound
    in SlipOK. Select `slipok` as the PromptPay slip provider in payment settings,
    set its API URL to `https://api.slipok.com/api/line/apikey/BRANCH_ID`, and set
