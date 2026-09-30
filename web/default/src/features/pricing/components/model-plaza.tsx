@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { EXCLUDED_GROUPS } from '../constants'
 import type { ParsedTier } from '../lib/billing-expr'
+import { compareModelVersionsNewestFirst } from '../lib/model-version'
 import {
   formatDynamicUnitPrice,
   getDynamicPricingTiers,
@@ -540,6 +541,8 @@ export function ModelPlaza(props: Props) {
           (!query ||
             model.model_name.toLowerCase().includes(query) ||
             (model.vendor_name || '').toLowerCase().includes(query))
+      ).sort((a, b) =>
+        compareModelVersionsNewestFirst(a.model_name, b.model_name)
       ),
     }))
     .filter((entry) => entry.models.length > 0)
